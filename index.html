@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<!-- viewport-fit=cover lets us paint into the iPhone/iPad safe areas -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Daily football trivia and a browsable history of every FIFA World Cup.">
+<meta name="theme-color" content="#0a7d3c" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1410" media="(prefers-color-scheme: dark)">
+<!-- Home-screen ("Add to Home Screen") behaviour on iOS/iPadOS -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pitch Perfect">
+<title>Pitch Perfect — Football Trivia &amp; World Cup History</title>
+<!-- Home-screen icon (iPad/iPhone) and PWA manifest (Android/Chrome).
+     Relative paths so it works from any GitHub Pages sub-path. -->
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%230a7d3c'/%3E%3Ctext x='50' y='68' font-size='54' text-anchor='middle'%3E%E2%9A%BD%3C/text%3E%3C/svg%3E">
+
+<style>
+/* ============================================================
+   1. DESIGN TOKENS
+   One palette defined on :root (light), re-declared for dark.
+   Every colour in the app comes from a token — no raw hex below.
+   ============================================================ */
+:root{
+  --bg:            #eef3ee;
+  --surface:       #ffffff;
+  --surface-2:     #f6f9f6;
+  --border:        #dde5de;
+  --ink:           #0f2318;
+  --ink-2:         #4a6154;
+  --ink-3:         #7c8f84;
+
+  --accent:        #0a7d3c;   /* pitch green — primary action */
+  --accent-ink:    #ffffff;
+  --accent-soft:   #e3f3e8;
+  --accent-line:   #b9e0c7;
+
+  --gold:          #a97407;   /* trophy / champion accent */
+  --gold-soft:     #fdf3dc;
+
+  --good:          #0a7d3c;
+  --bad:           #b3261e;
+  --bad-soft:      #fdecea;
+
+  --shadow:        0 1px 2px rgba(15,35,24,.06), 0 8px 24px rgba(15,35,24,.07);
+  --shadow-lg:     0 12px 40px rgba(15,35,24,.18);
+
+  --r-sm: 10px; --r-md: 16px; --r-lg: 22px;
+  --nav-h: 64px;
+  --maxw: 720px;
+
+  --font: system-ui, -apple-system, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:          #0b1410;
+    --surface:     #14211b;
+    --surface-2:   #1b2b23;
+    --border:      #26382e;
+    --ink:         #e9f2ec;
+    --ink-2:       #a7bdb1;
+    --ink-3:       #7b9187;
+
+    --accent:      #35c46f;
+    --accent-ink:  #06210f;
+    --accent-soft: #16342220;
+    --accent-line: #2c5c3f;
+
+    --gold:        #e8b545;
+    --gold-soft:   #2a2213;
+
+    --good:        #35c46f;
+    --bad:         #ff8a80;
+    --bad-soft:    #3a1d1a;
+
+    --shadow:      0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.35);
+    --shadow-lg:   0 12px 40px rgba(0,0,0,.55);
+  }
+}
+
+/* ============================================================
+   2. BASE
+   ============================================================ */
+*,*::before,*::after{ box-sizing:border-box; }
+html{ -webkit-text-size-adjust:100%; }
+body{
+  margin:0;
+  font-family:var(--font);
+  background:var(--bg);
+  color:var(--ink);
+  line-height:1.5;
+  /* stop iOS rubber-banding from showing a white void behind the app */
+  overscroll-behavior-y:none;
+  -webkit-font-smoothing:antialiased;
+}
+/* Kill the grey tap-flash and accidental text selection on controls */
+button,input,select{ font:inherit; color:inherit; -webkit-tap-highlight-color:transparent; }
+button{ cursor:pointer; border:none; background:none; }
+h1,h2,h3{ margin:0; line-height:1.2; letter-spacing:-.02em; }
+:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; border-radius:6px; }
+
+/* ============================================================
+   3. APP SHELL — header, scrolling main, fixed bottom nav
+   ============================================================ */
+.app-header{
+  position:sticky; top:0; z-index:20;
+  padding:calc(env(safe-area-inset-top) + 14px) 16px 12px;
+  background:color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter:saturate(180%) blur(14px);
+  -webkit-backdrop-filter:saturate(180%) blur(14px);
+  border-bottom:1px solid var(--border);
+}
+.app-header .wrap{
+  max-width:var(--maxw); margin:0 auto;
+  display:flex; align-items:center; gap:10px;
+}
+.brand{ display:flex; align-items:center; gap:9px; font-weight:800; font-size:19px; }
+.brand .ball{
+  width:30px; height:30px; border-radius:50%;
+  background:var(--accent); color:var(--accent-ink);
+  display:grid; place-items:center; font-size:16px;
+}
+.streak-pill{
+  margin-left:auto;
+  display:flex; align-items:center; gap:6px;
+  padding:6px 12px; border-radius:999px;
+  background:var(--surface); border:1px solid var(--border);
+  font-size:13px; font-weight:700; white-space:nowrap;
+}
+
+main{
+  max-width:var(--maxw); margin:0 auto;
+  padding:16px 16px calc(var(--nav-h) + env(safe-area-inset-bottom) + 28px);
+}
+.view[hidden]{ display:none; }
+.view{ animation:rise .28s ease both; }
+@keyframes rise{ from{ opacity:0; transform:translateY(8px);} to{ opacity:1; transform:none;} }
+
+/* --- Bottom tab bar --- */
+.tabbar{
+  position:fixed; left:0; right:0; bottom:0; z-index:30;
+  display:flex; justify-content:center; gap:6px;
+  padding:6px 12px calc(env(safe-area-inset-bottom) + 6px);
+  background:color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter:saturate(180%) blur(16px);
+  -webkit-backdrop-filter:saturate(180%) blur(16px);
+  border-top:1px solid var(--border);
+}
+.tabbar button{
+  flex:1; max-width:220px;
+  min-height:52px;                 /* generous iPad-friendly touch target */
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+  border-radius:14px;
+  color:var(--ink-3); font-size:11px; font-weight:700; letter-spacing:.01em;
+  transition:background .18s, color .18s;
+}
+.tabbar button .ico{ font-size:21px; line-height:1; }
+.tabbar button[aria-selected="true"]{ color:var(--accent); background:var(--accent-soft); }
+.tabbar button:active{ transform:scale(.97); }
+
+/* ============================================================
+   4. GENERIC PIECES — cards, buttons, chips
+   ============================================================ */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r-lg);
+  box-shadow:var(--shadow);
+  padding:20px;
+}
+.section-title{
+  display:flex; align-items:baseline; gap:8px;
+  margin:26px 4px 12px;
+  font-size:13px; font-weight:800; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--ink-3);
+}
+.btn{
+  min-height:52px; padding:0 22px;
+  border-radius:14px;
+  font-weight:800; font-size:16px;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  transition:transform .12s, opacity .18s, background .18s;
+}
+.btn:active{ transform:scale(.97); }
+.btn-primary{ background:var(--accent); color:var(--accent-ink); width:100%; }
+.btn-primary:disabled{ opacity:.45; }
+.btn-ghost{
+  background:var(--surface-2); color:var(--ink-2);
+  border:1px solid var(--border);
+  min-height:46px; font-size:14px; padding:0 16px;
+}
+
+/* ============================================================
+   5. DAILY CHALLENGE
+   ============================================================ */
+.daily-head{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; margin-bottom:14px;
+}
+.eyebrow{
+  font-size:12px; font-weight:800; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--accent);
+}
+.daily-date{ font-size:12px; font-weight:700; color:var(--ink-3); }
+
+.fact-card{
+  position:relative; overflow:hidden;
+  background:
+    radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    var(--surface);
+}
+/* Faint pitch stripes in the corner — decorative only */
+.fact-card::after{
+  content:""; position:absolute; right:-30px; top:-30px;
+  width:150px; height:150px; border-radius:50%;
+  border:14px solid var(--accent); opacity:.07;
+}
+.fact-text{
+  position:relative;
+  font-size:clamp(21px, 5.4vw, 28px);
+  font-weight:800; letter-spacing:-.02em;
+  margin:6px 0 18px;
+}
+.fact-cat{
+  display:inline-block; padding:4px 11px; border-radius:999px;
+  background:var(--accent-soft); color:var(--accent);
+  border:1px solid var(--accent-line);
+  font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em;
+}
+
+.guess-row{ display:flex; flex-direction:column; gap:10px; }
+.guess-input{
+  width:100%; min-height:56px;
+  padding:0 16px;
+  font-size:17px;                    /* ≥16px stops iOS auto-zoom on focus */
+  font-weight:600;
+  border-radius:14px;
+  border:2px solid var(--border);
+  background:var(--surface-2);
+  transition:border-color .18s, background .18s;
+}
+.guess-input::placeholder{ color:var(--ink-3); font-weight:500; }
+.guess-input:focus{ outline:none; border-color:var(--accent); background:var(--surface); }
+.guess-input:disabled{ opacity:.6; }
+
+.helper-row{ display:flex; gap:10px; margin-top:12px; }
+.helper-row .btn-ghost{ flex:1; }
+
+.feedback{
+  margin-top:14px; padding:14px 16px;
+  border-radius:14px; font-weight:700; font-size:15px;
+  display:flex; align-items:flex-start; gap:10px;
+  animation:rise .25s ease both;
+}
+.feedback.ok{  background:var(--accent-soft); color:var(--good); border:1px solid var(--accent-line); }
+.feedback.no{  background:var(--bad-soft);    color:var(--bad);  border:1px solid color-mix(in srgb, var(--bad) 35%, transparent); }
+.feedback.hint{background:var(--gold-soft);   color:var(--gold); border:1px solid color-mix(in srgb, var(--gold) 35%, transparent); }
+.feedback small{ display:block; font-weight:600; opacity:.85; margin-top:3px; }
+
+.shake{ animation:shake .4s; }
+@keyframes shake{
+  10%,90%{ transform:translateX(-2px);} 20%,80%{ transform:translateX(4px);}
+  30%,50%,70%{ transform:translateX(-7px);} 40%,60%{ transform:translateX(7px);}
+}
+
+/* Emoji confetti burst on a correct answer */
+.confetti{ position:fixed; inset:0; pointer-events:none; z-index:50; overflow:hidden; }
+.confetti span{
+  position:absolute; top:-10vh; font-size:22px;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  to{ transform:translateY(115vh) rotate(540deg); opacity:.1; }
+}
+
+/* --- Streak stat tiles ---------------------------------------
+   Single-hue, one number each: a stat tile is the right form for
+   a headline value, no chart needed.                            */
+.tiles{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.tile{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); padding:14px 12px; text-align:center;
+}
+.tile .n{ font-size:26px; font-weight:800; letter-spacing:-.03em; display:block; }
+.tile .l{ font-size:11px; font-weight:700; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em; }
+
+/* Favourite-team picker */
+.fav-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.fav-row label{ font-weight:700; font-size:14px; }
+.select{
+  flex:1; min-width:160px; min-height:50px; padding:0 12px;
+  border-radius:14px; border:2px solid var(--border);
+  background:var(--surface-2); font-weight:700; font-size:15px;
+}
+
+/* ============================================================
+   6. HISTORY VIEW
+   ============================================================ */
+.toolbar{ display:flex; flex-direction:column; gap:10px; margin-bottom:6px; }
+.search{
+  width:100%; min-height:52px; padding:0 16px 0 42px;
+  font-size:17px; border-radius:14px;
+  border:2px solid var(--border); background:var(--surface);
+}
+.search:focus{ outline:none; border-color:var(--accent); }
+.search-wrap{ position:relative; }
+.search-wrap::before{
+  content:"🔍"; position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  font-size:15px; opacity:.55; pointer-events:none;
+}
+.chips{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none; }
+.chips::-webkit-scrollbar{ display:none; }
+.chip{
+  flex:0 0 auto; min-height:42px; padding:0 16px;
+  border-radius:999px; border:1px solid var(--border);
+  background:var(--surface); color:var(--ink-2);
+  font-size:14px; font-weight:700; white-space:nowrap;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.chip[aria-pressed="true"]{
+  background:var(--accent); color:var(--accent-ink); border-color:var(--accent);
+}
+
+.wc-list{ display:grid; gap:12px; }
+@media(min-width:620px){ .wc-list{ grid-template-columns:1fr 1fr; } }
+
+.wc-card{
+  display:flex; align-items:center; gap:14px; width:100%;
+  text-align:left; padding:16px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+  transition:transform .14s, border-color .18s;
+}
+.wc-card:active{ transform:scale(.985); border-color:var(--accent); }
+.wc-year{
+  flex:0 0 auto; width:62px; height:62px; border-radius:14px;
+  display:grid; place-items:center;
+  background:var(--accent-soft); color:var(--accent);
+  border:1px solid var(--accent-line);
+  font-size:17px; font-weight:800; letter-spacing:-.02em;
+}
+.wc-card.is-fav .wc-year{ background:var(--gold-soft); color:var(--gold); border-color:color-mix(in srgb, var(--gold) 35%, transparent); }
+.wc-main{ min-width:0; flex:1; }
+.wc-winner{ font-size:17px; font-weight:800; display:flex; align-items:center; gap:6px; }
+.wc-sub{ font-size:13px; color:var(--ink-2); font-weight:600; }
+.wc-score{ font-size:12px; color:var(--ink-3); font-weight:700; margin-top:2px; }
+.wc-caret{ color:var(--ink-3); font-size:20px; flex:0 0 auto; }
+.empty{ text-align:center; padding:38px 20px; color:var(--ink-3); font-weight:600; }
+
+/* --- Ranked bar list: titles by country ----------------------
+   Single series, magnitude → one hue, bars anchored to a shared
+   baseline, value labelled directly. No legend (one series).    */
+.rank{ display:grid; gap:9px; }
+.rank-row{ display:grid; grid-template-columns:96px 1fr 26px; align-items:center; gap:10px; }
+.rank-name{ font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rank-track{ height:16px; background:var(--surface-2); border-radius:8px; overflow:hidden; }
+.rank-bar{
+  height:100%;
+  background:var(--accent);
+  border-radius:0 4px 4px 0;      /* 4px rounded data-end, flat at the baseline */
+  transition:width .6s cubic-bezier(.2,.8,.2,1);
+}
+.rank-val{ font-size:14px; font-weight:800; text-align:right; color:var(--ink-2); }
+
+/* ============================================================
+   7. DETAIL SHEET (modal)
+   ============================================================ */
+.sheet-scrim{
+  position:fixed; inset:0; z-index:60;
+  background:rgba(8,20,14,.5);
+  backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px);
+  display:flex; align-items:flex-end; justify-content:center;
+  animation:fade .2s ease both;
+}
+@keyframes fade{ from{opacity:0} to{opacity:1} }
+.sheet{
+  width:100%; max-width:var(--maxw);
+  max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  background:var(--surface);
+  border-radius:26px 26px 0 0;
+  box-shadow:var(--shadow-lg);
+  padding:10px 20px calc(env(safe-area-inset-bottom) + 26px);
+  animation:slideup .3s cubic-bezier(.2,.8,.2,1) both;
+}
+@media(min-width:620px){
+  .sheet-scrim{ align-items:center; }
+  .sheet{ border-radius:26px; max-height:82vh; }
+}
+@keyframes slideup{ from{ transform:translateY(100%);} to{ transform:none;} }
+.grabber{ width:44px; height:5px; border-radius:3px; background:var(--border); margin:0 auto 16px; }
+.sheet h2{ font-size:26px; }
+.sheet .host{ color:var(--ink-2); font-weight:700; font-size:15px; margin:4px 0 18px; }
+.kv{ display:grid; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; }
+.kv div{ display:flex; justify-content:space-between; gap:14px; padding:13px 15px; background:var(--surface); }
+.kv dt{ color:var(--ink-2); font-weight:600; font-size:14px; }
+.kv dd{ margin:0; font-weight:800; font-size:14px; text-align:right; }
+.trophy-note{
+  margin-top:16px; padding:14px 16px; border-radius:var(--r-md);
+  background:var(--gold-soft); color:var(--gold);
+  font-size:14px; font-weight:700; line-height:1.45;
+  border:1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+}
+.sheet .btn-ghost{ width:100%; margin-top:16px; }
+
+/* ============================================================
+   8. WORLD CUP 2026
+   ============================================================ */
+.champ-hero{ text-align:center; position:relative; overflow:hidden; }
+.champ-hero::after{
+  content:""; position:absolute; inset:0;
+  background:radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 65%);
+  pointer-events:none;
+}
+.champ-flag{ font-size:56px; line-height:1; margin:10px 0 4px; }
+.champ-name{ font-size:32px; font-weight:800; }
+.champ-sub{ color:var(--ink-2); font-weight:700; font-size:14px; margin:4px 0 14px; }
+.champ-final{
+  position:relative; display:inline-block;
+  padding:10px 16px; border-radius:14px;
+  background:var(--gold-soft); color:var(--gold);
+  border:1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  font-weight:800; font-size:14px; line-height:1.5;
+}
+
+.awards{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.award{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); padding:14px;
+}
+.award .al{ font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-3); }
+.award .an{ font-size:15px; font-weight:800; margin-top:3px; }
+.award .ad{ font-size:12px; font-weight:600; color:var(--ink-2); }
+
+/* Stage / group match rows */
+.rnd-head{
+  display:flex; align-items:center; gap:8px;
+  margin:18px 4px 10px; font-size:13px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.07em; color:var(--ink-3);
+}
+.match{
+  display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px;
+  width:100%; text-align:left; padding:13px 14px; margin-bottom:8px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+  transition:transform .14s, border-color .18s;
+}
+.match:active{ transform:scale(.985); border-color:var(--accent); }
+.m-team{ display:flex; align-items:center; gap:7px; min-width:0; font-weight:700; font-size:14px; }
+.m-team.right{ justify-content:flex-end; text-align:right; }
+.m-team .fl{ font-size:19px; line-height:1; flex:0 0 auto; }
+.m-team .nm{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.m-team.win{ font-weight:800; }
+.m-team.lose{ color:var(--ink-3); }
+.m-score{
+  flex:0 0 auto; padding:5px 11px; border-radius:9px;
+  background:var(--surface-2); border:1px solid var(--border);
+  font-weight:800; font-size:15px; letter-spacing:.02em; white-space:nowrap;
+}
+.m-meta{
+  grid-column:1 / -1; display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  margin-top:6px; font-size:11px; font-weight:600; color:var(--ink-3);
+}
+.badge{
+  padding:2px 7px; border-radius:6px; font-size:10px; font-weight:800;
+  text-transform:uppercase; letter-spacing:.05em;
+  background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent-line);
+}
+.badge.pens{ background:var(--gold-soft); color:var(--gold); border-color:color-mix(in srgb, var(--gold) 30%, transparent); }
+
+/* Group standings table */
+.grp-table{ width:100%; border-collapse:collapse; font-size:13px; }
+.grp-table th{
+  text-align:right; font-size:10px; font-weight:800; color:var(--ink-3);
+  text-transform:uppercase; letter-spacing:.05em; padding:0 0 8px;
+}
+.grp-table th:first-child{ text-align:left; }
+.grp-table td{ padding:9px 0; border-top:1px solid var(--border); text-align:right; font-weight:700; }
+.grp-table td:first-child{ text-align:left; font-weight:700; }
+.grp-table tr.qualified td:first-child{ color:var(--accent); }
+.grp-team{ display:flex; align-items:center; gap:8px; }
+.grp-team .fl{ font-size:17px; }
+.grp-team .pos{
+  width:19px; height:19px; border-radius:5px; flex:0 0 auto;
+  display:grid; place-items:center; font-size:10px; font-weight:800;
+  background:var(--surface-2); color:var(--ink-3); border:1px solid var(--border);
+}
+tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.grp-legend{ font-size:11px; color:var(--ink-3); font-weight:600; margin-top:12px; }
+
+/* Goal list inside the match detail sheet */
+.goals{ display:grid; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; margin-top:14px; }
+.goal{ display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surface); font-size:14px; }
+.goal .min{ font-weight:800; color:var(--accent); min-width:42px; font-size:13px; }
+.goal .who{ font-weight:700; flex:1; }
+.goal .tag{ font-size:10px; font-weight:800; text-transform:uppercase; color:var(--ink-3); }
+
+@media (prefers-reduced-motion:reduce){
+  *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}
+</style>
+</head>
+
+<body>
+
+<header class="app-header">
+  <div class="wrap">
+    <div class="brand"><span class="ball">⚽</span> Pitch Perfect</div>
+    <div class="streak-pill" id="streakPill" title="Current daily streak">🔥 <span id="streakNum">0</span></div>
+  </div>
+</header>
+
+<main>
+  <!-- ========== VIEW 1: DAILY CHALLENGE ========== -->
+  <section class="view" id="view-daily" role="tabpanel" aria-label="Daily Challenge">
+
+    <div class="card fact-card">
+      <div class="daily-head">
+        <span class="eyebrow">Daily Challenge</span>
+        <span class="daily-date" id="dailyDate"></span>
+      </div>
+
+      <span class="fact-cat" id="factCat">Trivia</span>
+      <p class="fact-text" id="factText">Loading today's question…</p>
+
+      <form class="guess-row" id="guessForm" autocomplete="off">
+        <input class="guess-input" id="guessInput" type="text"
+               placeholder="Which country?" aria-label="Your guess"
+               autocapitalize="words" autocorrect="off" spellcheck="false"
+               enterkeyhint="send">
+        <button class="btn btn-primary" id="submitBtn" type="submit">Submit Guess</button>
+      </form>
+
+      <div class="helper-row">
+        <button class="btn btn-ghost" id="hintBtn" type="button">💡 Hint</button>
+        <button class="btn btn-ghost" id="revealBtn" type="button">🏳️ Give up</button>
+      </div>
+
+      <div id="feedback"></div>
+    </div>
+
+    <h2 class="section-title">Your record</h2>
+    <div class="tiles">
+      <div class="tile"><span class="n" id="tStreak">0</span><span class="l">Streak</span></div>
+      <div class="tile"><span class="n" id="tBest">0</span><span class="l">Best</span></div>
+      <div class="tile"><span class="n" id="tSolved">0</span><span class="l">Solved</span></div>
+    </div>
+
+    <h2 class="section-title">Your team</h2>
+    <div class="card">
+      <div class="fav-row">
+        <label for="favSelect">Favourite team</label>
+        <select class="select" id="favSelect">
+          <option value="">— none —</option>
+        </select>
+      </div>
+      <p class="wc-sub" id="favNote" style="margin:12px 0 0"></p>
+    </div>
+  </section>
+
+  <!-- ========== VIEW 2: WORLD CUP 2026 ========== -->
+  <section class="view" id="view-wc2026" role="tabpanel" aria-label="World Cup 2026" hidden>
+
+    <!-- Champion hero -->
+    <div class="card champ-hero">
+      <span class="eyebrow">Canada · Mexico · USA 2026</span>
+      <div class="champ-flag" id="champFlag">🇪🇸</div>
+      <h2 class="champ-name" id="champName">Spain</h2>
+      <p class="champ-sub" id="champSub"></p>
+      <div class="champ-final" id="champFinal"></div>
+    </div>
+
+    <div class="tiles" style="margin-top:12px">
+      <div class="tile"><span class="n">48</span><span class="l">Teams</span></div>
+      <div class="tile"><span class="n" id="c26Matches">104</span><span class="l">Matches</span></div>
+      <div class="tile"><span class="n" id="c26Goals">308</span><span class="l">Goals</span></div>
+    </div>
+
+    <h2 class="section-title">Golden awards</h2>
+    <div class="awards" id="awards"></div>
+
+    <h2 class="section-title">Top scorers</h2>
+    <div class="card"><div class="rank" id="scorerList"></div></div>
+
+    <h2 class="section-title">Matches &amp; results</h2>
+    <div class="chips" id="stageSeg" role="group" aria-label="Stage"></div>
+    <div id="groupChipsWrap" class="chips" role="group" aria-label="Group" style="margin-top:8px"></div>
+    <div id="stageBody" style="margin-top:12px"></div>
+  </section>
+
+  <!-- ========== VIEW 3: WORLD CUP HISTORY ========== -->
+  <section class="view" id="view-history" role="tabpanel" aria-label="World Cup History" hidden>
+
+    <h2 class="section-title">At a glance</h2>
+    <div class="tiles">
+      <div class="tile"><span class="n" id="sTournaments">–</span><span class="l">Tournaments</span></div>
+      <div class="tile"><span class="n" id="sGoals">–</span><span class="l">Goals</span></div>
+      <div class="tile"><span class="n" id="sChampions">–</span><span class="l">Champions</span></div>
+    </div>
+
+    <h2 class="section-title">Titles won</h2>
+    <div class="card"><div class="rank" id="rankList"></div></div>
+
+    <h2 class="section-title">Every tournament</h2>
+    <div class="toolbar">
+      <div class="search-wrap">
+        <input class="search" id="searchInput" type="search"
+               placeholder="Search year, host, winner, scorer…" aria-label="Search tournaments">
+      </div>
+      <div class="chips" id="chips" role="group" aria-label="Filters"></div>
+    </div>
+    <div class="wc-list" id="wcList" style="margin-top:12px"></div>
+  </section>
+</main>
+
+<!-- ========== BOTTOM TAB BAR ========== -->
+<nav class="tabbar" role="tablist" aria-label="Main">
+  <button role="tab" data-view="daily"   aria-selected="true">
+    <span class="ico">🎯</span> Daily
+  </button>
+  <button role="tab" data-view="wc2026"  aria-selected="false">
+    <span class="ico">🌎</span> WC 2026
+  </button>
+  <button role="tab" data-view="history" aria-selected="false">
+    <span class="ico">🏆</span> History
+  </button>
+</nav>
+
+<script>
+"use strict";
+/* ==================================================================
+   PITCH PERFECT — Phase 1
+   Everything lives in one file. Sections:
+     A. DATA        — trivia bank + World Cup dataset (JSON-shaped)
+     B. STORE       — state + storage adapter (swap for cloud in Ph.2)
+     C. UTIL        — date seeding, PRNG, answer matching
+     D. DAILY       — the Guess-the-Country game
+     E. HISTORY     — tournament browser + stats
+     F. ROUTER      — tab switching + boot
+   ================================================================== */
+
+
+/* ==================================================================
+   A. DATA
+   Both datasets are plain JSON — no functions, no dates, no refs.
+   That means Phase 2 can replace either constant with:
+       const TRIVIA = await fetch('./data/trivia.json').then(r => r.json());
+   and nothing else in the app has to change.
+   ================================================================== */
+
+/* --- A1a. Classic trivia bank (all World Cup history) ---------------
+   Every question resolves to a COUNTRY. `aliases` accepts the ways
+   real people type that country; `hint` is shown on demand.        */
+const TRIVIA_CLASSIC = [
+  { id: 1,  category: "Titles",   fact: "This country has won the men's World Cup a record 5 times.",
+    answer: "Brazil",      aliases: ["brasil"],
+    hint: "South America. Champions in 1958, 1962, 1970, 1994 and 2002." },
+
+  { id: 2,  category: "Titles",   fact: "This nation won the very first World Cup in 1930, on home soil.",
+    answer: "Uruguay",     aliases: [],
+    hint: "A small South American country that also won in 1950." },
+
+  { id: 3,  category: "Legends",  fact: "Diego Maradona's 'Hand of God' goal in 1986 was scored for this country.",
+    answer: "Argentina",   aliases: [],
+    hint: "They lifted the trophy again in 2022." },
+
+  { id: 4,  category: "Hosts",    fact: "This country hosted the 2022 World Cup — the first ever held in November and December.",
+    answer: "Qatar",       aliases: [],
+    hint: "A Middle Eastern host, and the smallest nation ever to stage the tournament." },
+
+  { id: 5,  category: "Records", fact: "Just Fontaine scored a record 13 goals at a single World Cup in 1958, playing for this country.",
+    answer: "France",      aliases: [],
+    hint: "They went on to win the trophy in 1998 and 2018." },
+
+  { id: 6,  category: "Titles",   fact: "This country beat the hosts 7–1 in a famous 2014 semi-final on their way to a 4th title.",
+    answer: "Germany",     aliases: ["west germany", "deutschland"],
+    hint: "The Mineirazo. Their captain that night was Philipp Lahm." },
+
+  { id: 7,  category: "Titles",   fact: "This country won back-to-back World Cups in 1934 and 1938, and has 4 titles in total.",
+    answer: "Italy",       aliases: ["italia"],
+    hint: "The Azzurri — they also won in 1982 and 2006." },
+
+  { id: 8,  category: "Records", fact: "In 2010, this country won its first ever World Cup with a 1–0 extra-time final win.",
+    answer: "Spain",       aliases: ["españa", "espana"],
+    hint: "Andrés Iniesta scored the winner in Johannesburg." },
+
+  { id: 9,  category: "Legends",  fact: "Miroslav Klose, the World Cup's all-time top scorer with 16 goals, played for this country.",
+    answer: "Germany",     aliases: ["west germany", "deutschland"],
+    hint: "He broke Ronaldo's record at the 2014 tournament." },
+
+  { id: 10, category: "Hosts",    fact: "The 1966 World Cup was hosted and won by this country — their only title so far.",
+    answer: "England",     aliases: [],
+    hint: "Geoff Hurst scored a hat-trick in the final at Wembley." },
+
+  { id: 11, category: "Upsets",   fact: "In 2018 this country reached its first ever final, losing 4–2 to France.",
+    answer: "Croatia",     aliases: ["hrvatska"],
+    hint: "Luka Modrić won the Golden Ball that year." },
+
+  { id: 12, category: "Upsets",   fact: "This country has reached three World Cup finals (1974, 1978, 2010) without ever winning one.",
+    answer: "Netherlands", aliases: ["holland", "the netherlands", "nederland"],
+    hint: "Home of 'Total Football' and Johan Cruyff." },
+
+  { id: 13, category: "Africa",   fact: "In 2022 this country became the first African nation to reach a World Cup semi-final.",
+    answer: "Morocco",     aliases: ["maroc"],
+    hint: "The Atlas Lions knocked out Spain and Portugal on the way." },
+
+  { id: 14, category: "Asia",     fact: "This country reached the semi-finals as co-hosts in 2002, the best ever run by an Asian team.",
+    answer: "South Korea", aliases: ["korea", "korea republic", "republic of korea", "s korea"],
+    hint: "They shared hosting duties with Japan." },
+
+  { id: 15, category: "Records", fact: "Kylian Mbappé scored a hat-trick in the 2022 final for this country — and still lost.",
+    answer: "France",      aliases: [],
+    hint: "Les Bleus were the defending champions that day." },
+
+  { id: 16, category: "Hosts",    fact: "This country hosted in 1994, setting an attendance record that still stands.",
+    answer: "USA",         aliases: ["united states", "united states of america", "america", "u s a"],
+    hint: "The final was played at the Rose Bowl in Pasadena." },
+
+  { id: 17, category: "Legends",  fact: "Pelé won three World Cups — more than any other player — with this country.",
+    answer: "Brazil",      aliases: ["brasil"],
+    hint: "He was only 17 at his first tournament, in 1958." },
+
+  { id: 18, category: "Upsets",   fact: "This country stunned the holders Germany 2–0 in the 2018 group stage, knocking them out.",
+    answer: "South Korea", aliases: ["korea", "korea republic", "republic of korea", "s korea"],
+    hint: "Son Heung-min sealed it with a run into an empty net." },
+
+  { id: 19, category: "Records", fact: "The 'Maracanazo' of 1950 saw this country lose the deciding match at home in front of ~200,000 fans.",
+    answer: "Brazil",      aliases: ["brasil"],
+    hint: "Uruguay were the visitors who ruined the party." },
+
+  { id: 20, category: "Africa",   fact: "Roger Milla's corner-flag dance at Italia '90 announced this country to the world.",
+    answer: "Cameroon",    aliases: ["cameroun"],
+    hint: "The Indomitable Lions — first African side to reach a quarter-final." }
+];
+
+/* --- A1b. World Cup 2026 trivia -------------------------------------
+   Every fact below is derived from the real 2026 match data in A3 and
+   was cross-checked against the final tournament record.             */
+const TRIVIA_2026 = [
+  { id: 2601, category: "2026 Final", fact: "This country won the 2026 World Cup, beating Argentina 1–0 after extra time at MetLife Stadium.",
+    answer: "Spain", aliases: ["españa", "espana"],
+    hint: "Their second title, 16 years after their first. Ferran Torres scored in the 106th minute." },
+
+  { id: 2602, category: "2026 Final", fact: "This country lost the 2026 final to a 106th-minute Ferran Torres goal.",
+    answer: "Argentina", aliases: [],
+    hint: "The defending champions, led again by Lionel Messi." },
+
+  { id: 2603, category: "2026 Golden Boot", fact: "Kylian Mbappé won the 2026 Golden Boot with 10 goals playing for this country.",
+    answer: "France", aliases: [],
+    hint: "They finished fourth after losing the third-place play-off 6–4." },
+
+  { id: 2604, category: "2026 Knockouts", fact: "This country finished third in 2026, winning a wild play-off 6–4 with a Bukayo Saka hat-trick.",
+    answer: "England", aliases: [],
+    hint: "Jude Bellingham scored 7 goals across the tournament for them." },
+
+  { id: 2605, category: "2026 Upsets", fact: "Erling Haaland scored twice late on as this country knocked Brazil out 2–1 in the Round of 16.",
+    answer: "Norway", aliases: [],
+    hint: "A Scandinavian side who then lost to England in the quarter-finals." },
+
+  { id: 2606, category: "2026 Africa", fact: "This country beat the Netherlands on penalties in the Round of 32 and reached the 2026 quarter-finals.",
+    answer: "Morocco", aliases: ["maroc"],
+    hint: "North African side who also reached the semi-finals in 2022." },
+
+  { id: 2607, category: "2026 Hosts", fact: "This co-host opened the 2026 World Cup with a 2–0 win over South Africa and won Group A without conceding.",
+    answer: "Mexico", aliases: ["méxico"],
+    hint: "The opening match was played at the Estadio Azteca." },
+
+  { id: 2608, category: "2026 Upsets", fact: "This country knocked Germany out of the 2026 World Cup 4–3 on penalties in the Round of 32.",
+    answer: "Paraguay", aliases: [],
+    hint: "A South American side who went out to France in the next round." },
+
+  { id: 2609, category: "2026 Knockouts", fact: "This country beat Australia 4–2 on penalties in the Round of 32 before losing to Argentina.",
+    answer: "Egypt", aliases: [],
+    hint: "The Pharaohs, who finished second in Group G." },
+
+  { id: 2610, category: "2026 Knockouts", fact: "This country won a 0–0 shoot-out against Colombia to reach the 2026 quarter-finals.",
+    answer: "Switzerland", aliases: ["suisse", "schweiz"],
+    hint: "They won Group B, then lost to Argentina in extra time." },
+
+  { id: 2611, category: "2026 Debutants", fact: "On their World Cup debut, this island nation took Argentina to extra time in the Round of 32.",
+    answer: "Cape Verde", aliases: ["cabo verde"],
+    hint: "An Atlantic archipelago off West Africa, drawn in Group H with Spain." },
+
+  { id: 2612, category: "2026 Knockouts", fact: "This country beat the United States 4–1 in the Round of 16 before losing to Spain.",
+    answer: "Belgium", aliases: ["belgique", "belgie", "belgië"],
+    hint: "The Red Devils, who also beat Senegal in extra time." },
+
+  { id: 2613, category: "2026 Records", fact: "This co-host recorded a 6–0 win over Qatar in the 2026 group stage.",
+    answer: "Canada", aliases: [],
+    hint: "They reached the Round of 16, where Morocco beat them 3–0." },
+
+  { id: 2614, category: "2026 Records", fact: "This country scored the biggest win of 2026, thrashing Curaçao 7–1 — then went out on penalties.",
+    answer: "Germany", aliases: ["deutschland"],
+    hint: "Four-time champions, beaten by Paraguay in the Round of 32." },
+
+  { id: 2615, category: "2026 Records", fact: "Unai Simón won the 2026 Golden Glove for this country, which conceded just one goal in eight matches.",
+    answer: "Spain", aliases: ["españa", "espana"],
+    hint: "Rodri also won the Golden Ball for them." },
+
+  { id: 2616, category: "2026 Golden Boot", fact: "Lionel Messi scored 8 goals at the 2026 World Cup for this country.",
+    answer: "Argentina", aliases: [],
+    hint: "Only Mbappé scored more. They lost the final in extra time." },
+
+  { id: 2617, category: "2026 Hosts", fact: "This co-host won Group D but was beaten 4–1 by Belgium in the Round of 16.",
+    answer: "USA", aliases: ["united states", "united states of america", "america", "u s a"],
+    hint: "They hosted the final at MetLife Stadium in New Jersey." },
+
+  { id: 2618, category: "2026 Knockouts", fact: "This country lost 1–0 to their Iberian neighbours in the 2026 Round of 16.",
+    answer: "Portugal", aliases: [],
+    hint: "They finished second in Group K behind Colombia." },
+
+  { id: 2619, category: "2026 Africa", fact: "This country beat Iraq 5–0 in the group stage, then lost to Belgium in extra time.",
+    answer: "Senegal", aliases: [],
+    hint: "The Lions of Teranga qualified as one of the best third-placed teams." },
+
+  { id: 2620, category: "2026 Groups", fact: "This country won Group I with a perfect nine points and 10 goals, and reached the semi-finals.",
+    answer: "France", aliases: [],
+    hint: "Les Bleus, beaten 2–0 by Spain in the last four." }
+];
+
+/* The daily game currently draws from the 2026 bank.
+   To mix in all-time history instead, use:
+       const TRIVIA = [...TRIVIA_2026, ...TRIVIA_CLASSIC];          */
+const TRIVIA = TRIVIA_2026;
+
+
+/* --- A2. World Cup tournaments ------------------------------------
+   Shaped exactly like a records array you'd fetch from a public
+   football-history JSON dataset on GitHub.                          */
+const WORLD_CUPS = [
+  { year:1930, host:"Uruguay",            winner:"Uruguay",      runnerUp:"Argentina",      score:"4–2",
+    topScorer:"Guillermo Stábile",  goals:8,  teams:13, matches:18, totalGoals:70,
+    note:"The first ever World Cup. Only 13 teams entered — four from Europe, after a long boat trip." },
+  { year:1934, host:"Italy",              winner:"Italy",        runnerUp:"Czechoslovakia", score:"2–1 (a.e.t.)",
+    topScorer:"Oldřich Nejedlý",    goals:5,  teams:16, matches:17, totalGoals:70,
+    note:"Holders Uruguay refused to travel, making them the only champions never to defend their title." },
+  { year:1938, host:"France",             winner:"Italy",        runnerUp:"Hungary",        score:"4–2",
+    topScorer:"Leônidas",           goals:7,  teams:15, matches:18, totalGoals:84,
+    note:"Italy became the first nation to retain the trophy — nobody did it again until Brazil in 1962." },
+  { year:1950, host:"Brazil",             winner:"Uruguay",      runnerUp:"Brazil",         score:"2–1",
+    topScorer:"Ademir",             goals:8,  teams:13, matches:22, totalGoals:88,
+    note:"The 'Maracanazo': Uruguay silenced a record home crowd in the decisive final-pool match." },
+  { year:1954, host:"Switzerland",        winner:"West Germany", runnerUp:"Hungary",        score:"3–2",
+    topScorer:"Sándor Kocsis",      goals:11, teams:16, matches:26, totalGoals:140,
+    note:"The 'Miracle of Bern'. Still the highest-scoring World Cup ever by goals per game." },
+  { year:1958, host:"Sweden",             winner:"Brazil",       runnerUp:"Sweden",         score:"5–2",
+    topScorer:"Just Fontaine",      goals:13, teams:16, matches:35, totalGoals:126,
+    note:"A 17-year-old Pelé scored twice in the final. Fontaine's 13 goals remain a single-tournament record." },
+  { year:1962, host:"Chile",              winner:"Brazil",       runnerUp:"Czechoslovakia", score:"3–1",
+    topScorer:"Garrincha & others", goals:4,  teams:16, matches:32, totalGoals:89,
+    note:"Pelé was injured early, so Garrincha carried Brazil to a second straight title." },
+  { year:1966, host:"England",            winner:"England",      runnerUp:"West Germany",   score:"4–2 (a.e.t.)",
+    topScorer:"Eusébio",            goals:9,  teams:16, matches:32, totalGoals:89,
+    note:"Geoff Hurst's hat-trick is still the only one scored in a World Cup final." },
+  { year:1970, host:"Mexico",             winner:"Brazil",       runnerUp:"Italy",          score:"4–1",
+    topScorer:"Gerd Müller",        goals:10, teams:16, matches:32, totalGoals:95,
+    note:"Widely called the greatest team ever assembled — and the first World Cup broadcast in colour." },
+  { year:1974, host:"West Germany",       winner:"West Germany", runnerUp:"Netherlands",    score:"2–1",
+    topScorer:"Grzegorz Lato",      goals:7,  teams:16, matches:38, totalGoals:97,
+    note:"Cruyff's Total Football dazzled everyone except the hosts, who won the final that mattered." },
+  { year:1978, host:"Argentina",          winner:"Argentina",    runnerUp:"Netherlands",    score:"3–1 (a.e.t.)",
+    topScorer:"Mario Kempes",       goals:6,  teams:16, matches:38, totalGoals:102,
+    note:"Kempes scored twice in the final; the Netherlands lost a second final in a row." },
+  { year:1982, host:"Spain",              winner:"Italy",        runnerUp:"West Germany",   score:"3–1",
+    topScorer:"Paolo Rossi",        goals:6,  teams:24, matches:52, totalGoals:146,
+    note:"Expanded to 24 teams. Rossi returned from a two-year ban to win the Golden Boot." },
+  { year:1986, host:"Mexico",             winner:"Argentina",    runnerUp:"West Germany",   score:"3–2",
+    topScorer:"Gary Lineker",       goals:6,  teams:24, matches:52, totalGoals:132,
+    note:"Maradona's tournament: the Hand of God and the Goal of the Century, four minutes apart." },
+  { year:1990, host:"Italy",              winner:"West Germany", runnerUp:"Argentina",      score:"1–0",
+    topScorer:"Salvatore Schillaci",goals:6,  teams:24, matches:52, totalGoals:115,
+    note:"The lowest-scoring World Cup on record — it led directly to three points for a win." },
+  { year:1994, host:"USA",                winner:"Brazil",       runnerUp:"Italy",          score:"0–0, 3–2 pens",
+    topScorer:"Stoichkov & Salenko",goals:6,  teams:24, matches:52, totalGoals:141,
+    note:"The first final decided on penalties. Baggio skied the decisive kick." },
+  { year:1998, host:"France",             winner:"France",       runnerUp:"Brazil",         score:"3–0",
+    topScorer:"Davor Šuker",        goals:6,  teams:32, matches:64, totalGoals:171,
+    note:"Zidane headed in twice as hosts France won their first title in a 32-team tournament." },
+  { year:2002, host:"South Korea & Japan",winner:"Brazil",       runnerUp:"Germany",        score:"2–0",
+    topScorer:"Ronaldo",            goals:8,  teams:32, matches:64, totalGoals:161,
+    note:"The first World Cup in Asia, and the first co-hosted. Brazil's record fifth star." },
+  { year:2006, host:"Germany",            winner:"Italy",        runnerUp:"France",         score:"1–1, 5–3 pens",
+    topScorer:"Miroslav Klose",     goals:5,  teams:32, matches:64, totalGoals:147,
+    note:"Zidane's last act as a player was a headbutt — and a red card — in the final." },
+  { year:2010, host:"South Africa",       winner:"Spain",        runnerUp:"Netherlands",    score:"1–0 (a.e.t.)",
+    topScorer:"Thomas Müller",      goals:5,  teams:32, matches:64, totalGoals:145,
+    note:"Africa's first World Cup, a soundtrack of vuvuzelas, and Spain's first title." },
+  { year:2014, host:"Brazil",             winner:"Germany",      runnerUp:"Argentina",      score:"1–0 (a.e.t.)",
+    topScorer:"James Rodríguez",    goals:6,  teams:32, matches:64, totalGoals:171,
+    note:"Germany's 7–1 demolition of hosts Brazil in the semi-final became known as the Mineirazo." },
+  { year:2018, host:"Russia",             winner:"France",       runnerUp:"Croatia",        score:"4–2",
+    topScorer:"Harry Kane",         goals:6,  teams:32, matches:64, totalGoals:169,
+    note:"VAR arrived, and a 19-year-old Mbappé became the first teenager to score in a final since Pelé." },
+  { year:2022, host:"Qatar",              winner:"Argentina",    runnerUp:"France",         score:"3–3, 4–2 pens",
+    topScorer:"Kylian Mbappé",      goals:8,  teams:32, matches:64, totalGoals:172,
+    note:"Called the greatest final ever: Messi finally lifted the trophy after Mbappé's hat-trick." }
+];
+
+/* --- A3. World Cup 2026 — Canada · Mexico · USA ---------------------
+   Real results for all 104 matches, sourced from the public-domain
+   openfootball/worldcup.json dataset on GitHub and cross-checked
+   against the official FIFA tournament record (308 goals, 104 matches).
+
+   Match shape:  r  round — "G" for group, else R32/R16/QF/SF/3RD/F
+                 g  group letter (group matches only)
+                 ft full-time score,  et extra time,  p penalty shoot-out
+                 s1/s2  scorers: [name, minute] or [name, minute, "og"|"p"]
+
+   Swap this constant for a fetch() in Phase 2 — the shape is unchanged:
+       const WC2026_MATCHES = await fetch('./data/wc2026.json').then(r => r.json());
+   -------------------------------------------------------------------- */
+const WC2026 = {
+  host: "Canada, Mexico & USA", teams: 48, matches: 104, totalGoals: 308,
+  dates: "11 June – 19 July 2026", attendance: "6,810,966",
+  champion: "Spain", runnerUp: "Argentina", third: "England", fourth: "France",
+  awards: [
+    { label: "Golden Boot",  name: "Kylian Mbappé", detail: "France · 10 goals" },
+    { label: "Golden Ball",  name: "Rodri",         detail: "Spain · best player" },
+    { label: "Golden Glove", name: "Unai Simón",    detail: "Spain · 1 goal conceded" },
+    { label: "Young Player", name: "Pau Cubarsí",   detail: "Spain" }
+  ]
+};
+
+/* Flag emoji for all 48 finalists (generated from ISO codes). */
+const FLAG = {
+  "Algeria":"🇩🇿", "Argentina":"🇦🇷", "Australia":"🇦🇺", "Austria":"🇦🇹", "Belgium":"🇧🇪",
+  "Bosnia & Herzegovina":"🇧🇦", "Brazil":"🇧🇷", "Canada":"🇨🇦", "Cape Verde":"🇨🇻",
+  "Colombia":"🇨🇴", "Croatia":"🇭🇷", "Curaçao":"🇨🇼", "Czech Republic":"🇨🇿", "DR Congo":"🇨🇩",
+  "Ecuador":"🇪🇨", "Egypt":"🇪🇬", "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿", "France":"🇫🇷", "Germany":"🇩🇪",
+  "Ghana":"🇬🇭", "Haiti":"🇭🇹", "Iran":"🇮🇷", "Iraq":"🇮🇶", "Ivory Coast":"🇨🇮", "Japan":"🇯🇵",
+  "Jordan":"🇯🇴", "Mexico":"🇲🇽", "Morocco":"🇲🇦", "Netherlands":"🇳🇱", "New Zealand":"🇳🇿",
+  "Norway":"🇳🇴", "Panama":"🇵🇦", "Paraguay":"🇵🇾", "Portugal":"🇵🇹", "Qatar":"🇶🇦",
+  "Saudi Arabia":"🇸🇦", "Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿", "Senegal":"🇸🇳", "South Africa":"🇿🇦",
+  "South Korea":"🇰🇷", "Spain":"🇪🇸", "Sweden":"🇸🇪", "Switzerland":"🇨🇭", "Tunisia":"🇹🇳",
+  "Turkey":"🇹🇷", "USA":"🇺🇸", "Uruguay":"🇺🇾", "Uzbekistan":"🇺🇿"
+};
+
+const WC2026_MATCHES = [
+  {r:"G", d:"2026-06-11", g:"A", t1:"Mexico", t2:"South Africa", ft:[2,0], v:"Mexico City", s1:[["Julián Quiñones","9"],["Raúl Jiménez","67"]]},
+  {r:"G", d:"2026-06-11", g:"A", t1:"South Korea", t2:"Czech Republic", ft:[2,1], v:"Guadalajara", s1:[["Hwang In-Beom","67"],["Oh Hyeon-Gyu","80"]], s2:[["Ladislav Krejcí","59"]]},
+  {r:"G", d:"2026-06-18", g:"A", t1:"Czech Republic", t2:"South Africa", ft:[1,1], v:"Atlanta", s1:[["Michal Sadílek","6"]], s2:[["Teboho Mokoena","83","p"]]},
+  {r:"G", d:"2026-06-18", g:"A", t1:"Mexico", t2:"South Korea", ft:[1,0], v:"Guadalajara", s1:[["Luis Romo","50"]]},
+  {r:"G", d:"2026-06-24", g:"A", t1:"Czech Republic", t2:"Mexico", ft:[0,3], v:"Mexico City", s2:[["Mateo Chávez","55"],["Julián Quiñones","61"],["Álvaro Fidalgo","90+4"]]},
+  {r:"G", d:"2026-06-24", g:"A", t1:"South Africa", t2:"South Korea", ft:[1,0], v:"Monterrey", s1:[["Thapelo Maseko","63"]]},
+  {r:"G", d:"2026-06-12", g:"B", t1:"Canada", t2:"Bosnia & Herzegovina", ft:[1,1], v:"Toronto", s1:[["Cyle Larin","78"]], s2:[["Jovo Lukić","21"]]},
+  {r:"G", d:"2026-06-13", g:"B", t1:"Qatar", t2:"Switzerland", ft:[1,1], v:"San Francisco Bay Area", s1:[["Miro Muheim","90+4","og"]], s2:[["Breel Embolo","17","p"]]},
+  {r:"G", d:"2026-06-18", g:"B", t1:"Switzerland", t2:"Bosnia & Herzegovina", ft:[4,1], v:"Los Angeles", s1:[["Johan Manzambi","74"],["Johan Manzambi","90"],["Rubén Vargas","84"],["Granit Xhaka","90+7","p"]], s2:[["Ermin Mahmic","90+3"]]},
+  {r:"G", d:"2026-06-18", g:"B", t1:"Canada", t2:"Qatar", ft:[6,0], v:"Vancouver", s1:[["Cyle Larin","16"],["Jonathan David","29"],["Jonathan David","45+3"],["Nathan Saliba","64"],["Mohamed Manai","75","og"],["Jonathan David","90+2"]]},
+  {r:"G", d:"2026-06-24", g:"B", t1:"Switzerland", t2:"Canada", ft:[2,1], v:"Vancouver", s1:[["Rubén Vargas","46"],["Johan Manzambi","57"]], s2:[["Promise David","76"]]},
+  {r:"G", d:"2026-06-24", g:"B", t1:"Bosnia & Herzegovina", t2:"Qatar", ft:[3,1], v:"Seattle", s1:[["Kerim Alajbegovic","29"],["Mahmoud Abunada","34","og"],["Ermin Mahmic","80"]], s2:[["Hassan Al-Haydos","42"]]},
+  {r:"G", d:"2026-06-13", g:"C", t1:"Brazil", t2:"Morocco", ft:[1,1], v:"New York/New Jersey", s1:[["Vinícius Júnior","32"]], s2:[["Ismael Saibari","21"]]},
+  {r:"G", d:"2026-06-13", g:"C", t1:"Haiti", t2:"Scotland", ft:[0,1], v:"Boston", s2:[["John McGinn","28"]]},
+  {r:"G", d:"2026-06-19", g:"C", t1:"Scotland", t2:"Morocco", ft:[0,1], v:"Boston", s2:[["Ismael Saibari","2"]]},
+  {r:"G", d:"2026-06-19", g:"C", t1:"Brazil", t2:"Haiti", ft:[3,0], v:"Philadelphia", s1:[["Matheus Cunha","23"],["Matheus Cunha","36"],["Vinícius Júnior","45+3"]]},
+  {r:"G", d:"2026-06-24", g:"C", t1:"Scotland", t2:"Brazil", ft:[0,3], v:"Miami", s2:[["Vinícius Júnior","7"],["Vinícius Júnior","45+3"],["Matheus Cunha","60"]]},
+  {r:"G", d:"2026-06-24", g:"C", t1:"Morocco", t2:"Haiti", ft:[4,2], v:"Atlanta", s1:[["Achraf Hakimi","39"],["Ismael Saibari","45+1"],["Soufiane Rahimi","78"],["Gessime Yassine","89"]], s2:[["Yassine Bounou","10","og"],["Wilson Isidor","43"]]},
+  {r:"G", d:"2026-06-12", g:"D", t1:"USA", t2:"Paraguay", ft:[4,1], v:"Los Angeles", s1:[["Damian Bobadilla","7","og"],["Folarin Balogun","31"],["Folarin Balogun","45+5"],["Giovanni Reyna","90+8"]], s2:[["Mauricio","73"]]},
+  {r:"G", d:"2026-06-13", g:"D", t1:"Australia", t2:"Turkey", ft:[2,0], v:"Vancouver", s1:[["Nestory Irankunda","27"],["Connor Metcalfe","75"]]},
+  {r:"G", d:"2026-06-19", g:"D", t1:"USA", t2:"Australia", ft:[2,0], v:"Seattle", s1:[["Cameron Burgess","11","og"],["Alex Freeman","43"]]},
+  {r:"G", d:"2026-06-19", g:"D", t1:"Turkey", t2:"Paraguay", ft:[0,1], v:"San Francisco Bay Area", s2:[["Matías Galarza","2"]]},
+  {r:"G", d:"2026-06-25", g:"D", t1:"Turkey", t2:"USA", ft:[3,2], v:"Los Angeles", s1:[["Arda Güler","10"],["Baris Alper Yilmaz","31"],["Kaan Ayhan","90+8"]], s2:[["Auston Trusty","3"],["Sebastian Berhalter","49"]]},
+  {r:"G", d:"2026-06-25", g:"D", t1:"Paraguay", t2:"Australia", ft:[0,0], v:"San Francisco Bay Area"},
+  {r:"G", d:"2026-06-14", g:"E", t1:"Germany", t2:"Curaçao", ft:[7,1], v:"Houston", s1:[["Felix Nmecha","6"],["Nico Schlotterbeck","38"],["Kai Havertz","45+5","p"],["Kai Havertz","88"],["Jamal Musiala","47"],["Nathaniel Brown","68"],["Deniz Undav","78"]], s2:[["Livano Comenencia","21"]]},
+  {r:"G", d:"2026-06-14", g:"E", t1:"Ivory Coast", t2:"Ecuador", ft:[1,0], v:"Philadelphia", s1:[["Amad Diallo","90"]]},
+  {r:"G", d:"2026-06-20", g:"E", t1:"Germany", t2:"Ivory Coast", ft:[2,1], v:"Toronto", s1:[["Deniz Undav","68"],["Deniz Undav","90+4"]], s2:[["Franck Kessié","30"]]},
+  {r:"G", d:"2026-06-20", g:"E", t1:"Ecuador", t2:"Curaçao", ft:[0,0], v:"Kansas City"},
+  {r:"G", d:"2026-06-25", g:"E", t1:"Curaçao", t2:"Ivory Coast", ft:[0,2], v:"Philadelphia", s2:[["Nicolas Pépé","7"],["Nicolas Pépé","64"]]},
+  {r:"G", d:"2026-06-25", g:"E", t1:"Ecuador", t2:"Germany", ft:[2,1], v:"New York/New Jersey", s1:[["Nilson Angulo","9"],["Gonzalo Plata","77"]], s2:[["Leroy Sané","2"]]},
+  {r:"G", d:"2026-06-14", g:"F", t1:"Netherlands", t2:"Japan", ft:[2,2], v:"Dallas", s1:[["Virgil van Dijk","51"],["Crysencio Summerville","64"]], s2:[["Keito Nakamura","57"],["Daichi Kamada","88"]]},
+  {r:"G", d:"2026-06-14", g:"F", t1:"Sweden", t2:"Tunisia", ft:[5,1], v:"Monterrey", s1:[["Yasin Ayari","7"],["Yasin Ayari","90+6"],["Alexander Isak","30"],["Viktor Gyökeres","59"],["Mattias Svanberg","84"]], s2:[["Omar Rekik","43"]]},
+  {r:"G", d:"2026-06-20", g:"F", t1:"Netherlands", t2:"Sweden", ft:[5,1], v:"Houston", s1:[["Brian Brobbey","5"],["Brian Brobbey","17"],["Cody Gakpo","47"],["Cody Gakpo","54"],["Crysencio Summerville","89"]], s2:[["Anthony Elanga","59"]]},
+  {r:"G", d:"2026-06-20", g:"F", t1:"Tunisia", t2:"Japan", ft:[0,4], v:"Monterrey", s2:[["Daichi Kamada","4"],["Ayase Ueda","31"],["Ayase Ueda","83"],["Junya Ito","69"]]},
+  {r:"G", d:"2026-06-25", g:"F", t1:"Japan", t2:"Sweden", ft:[1,1], v:"Dallas", s1:[["Daizen Maeda","56"]], s2:[["Anthony Elanga","62"]]},
+  {r:"G", d:"2026-06-25", g:"F", t1:"Tunisia", t2:"Netherlands", ft:[1,3], v:"Kansas City", s1:[["Hazem Mastouri","54"]], s2:[["Ellyes Skhiri","3","og"],["Brian Brobbey","7"],["Jan Paul van Hecke","62"]]},
+  {r:"G", d:"2026-06-15", g:"G", t1:"Belgium", t2:"Egypt", ft:[1,1], v:"Seattle", s1:[["Mohamed Hany","66","og"]], s2:[["Emam Ashour","19"]]},
+  {r:"G", d:"2026-06-15", g:"G", t1:"Iran", t2:"New Zealand", ft:[2,2], v:"Los Angeles", s1:[["Ramin Rezaeian","32"],["Mohammad Mohebbi","64"]], s2:[["Elijah Just","7"],["Elijah Just","54"]]},
+  {r:"G", d:"2026-06-21", g:"G", t1:"Belgium", t2:"Iran", ft:[0,0], v:"Los Angeles"},
+  {r:"G", d:"2026-06-21", g:"G", t1:"New Zealand", t2:"Egypt", ft:[1,3], v:"Vancouver", s1:[["Finn Surman","15"]], s2:[["Mostafa Zico","58"],["Mohamed Salah","67"],["Trézéguet","82"]]},
+  {r:"G", d:"2026-06-26", g:"G", t1:"Egypt", t2:"Iran", ft:[1,1], v:"Seattle", s1:[["Mahmoud Saber","5"]], s2:[["Ramin Rezaeian","14"]]},
+  {r:"G", d:"2026-06-26", g:"G", t1:"New Zealand", t2:"Belgium", ft:[1,5], v:"Vancouver", s1:[["Elijah Just","84"]], s2:[["Leandro Trossard","28"],["Leandro Trossard","50"],["Kevin De Bruyne","66"],["Romelu Lukaku","86"],["Alexis Saelemaekers","90+4"]]},
+  {r:"G", d:"2026-06-15", g:"H", t1:"Spain", t2:"Cape Verde", ft:[0,0], v:"Atlanta"},
+  {r:"G", d:"2026-06-15", g:"H", t1:"Saudi Arabia", t2:"Uruguay", ft:[1,1], v:"Miami", s1:[["Abdulelah Al-Amri","41"]], s2:[["Maxi Araújo","80"]]},
+  {r:"G", d:"2026-06-21", g:"H", t1:"Spain", t2:"Saudi Arabia", ft:[4,0], v:"Atlanta", s1:[["Lamine Yamal","10"],["Mikel Oyarzabal","21"],["Mikel Oyarzabal","24"],["Hassan Al-Tambakti","49","og"]]},
+  {r:"G", d:"2026-06-21", g:"H", t1:"Uruguay", t2:"Cape Verde", ft:[2,2], v:"Miami", s1:[["Maxi Araújo","44"],["Agustín Cano","45+6"]], s2:[["Kevin Pina","21"],["Hélio Varela","61"]]},
+  {r:"G", d:"2026-06-26", g:"H", t1:"Cape Verde", t2:"Saudi Arabia", ft:[0,0], v:"Houston"},
+  {r:"G", d:"2026-06-26", g:"H", t1:"Uruguay", t2:"Spain", ft:[0,1], v:"Guadalajara", s2:[["Álex Baena","42"]]},
+  {r:"G", d:"2026-06-16", g:"I", t1:"France", t2:"Senegal", ft:[3,1], v:"New York/New Jersey", s1:[["Kylian Mbappé","66"],["Kylian Mbappé","90+6"],["Bradley Barcola","82"]], s2:[["Ibrahim Mbaye","90+5"]]},
+  {r:"G", d:"2026-06-16", g:"I", t1:"Iraq", t2:"Norway", ft:[1,4], v:"Boston", s1:[["Aymen Hussein","39"]], s2:[["Erling Haaland","29"],["Erling Haaland","43"],["Leo Østigard","76"],["Aymen Hussein","90+6","og"]]},
+  {r:"G", d:"2026-06-22", g:"I", t1:"France", t2:"Iraq", ft:[3,0], v:"Philadelphia", s1:[["Kylian Mbappé","14"],["Kylian Mbappé","54"],["Ousmane Dembélé","66"]]},
+  {r:"G", d:"2026-06-22", g:"I", t1:"Norway", t2:"Senegal", ft:[3,2], v:"New York/New Jersey", s1:[["Marcus Holmgren Pedersen","43"],["Erling Haaland","48"],["Erling Haaland","58"]], s2:[["Ismaïla Sarr","53"],["Ismaïla Sarr","90+3"]]},
+  {r:"G", d:"2026-06-26", g:"I", t1:"Norway", t2:"France", ft:[1,4], v:"Boston", s1:[["Thelo Aasgaard","21"]], s2:[["Ousmane Dembélé","7"],["Ousmane Dembélé","20"],["Ousmane Dembélé","32"],["Désiré Doué","90+4"]]},
+  {r:"G", d:"2026-06-26", g:"I", t1:"Senegal", t2:"Iraq", ft:[5,0], v:"Toronto", s1:[["Habib Diarra","4"],["Ismaïla Sarr","56"],["Pape Gueye","59"],["Pape Gueye","71"],["Iliman Ndiaye","82"]]},
+  {r:"G", d:"2026-06-16", g:"J", t1:"Argentina", t2:"Algeria", ft:[3,0], v:"Kansas City", s1:[["Lionel Messi","17"],["Lionel Messi","60"],["Lionel Messi","76"]]},
+  {r:"G", d:"2026-06-16", g:"J", t1:"Austria", t2:"Jordan", ft:[3,1], v:"San Francisco Bay Area", s1:[["Romano Schmid","21"],["Yazan Al-Arab","76","og"],["Marko Arnautovic","90+12","p"]], s2:[["Ali Olwan","50"]]},
+  {r:"G", d:"2026-06-22", g:"J", t1:"Argentina", t2:"Austria", ft:[2,0], v:"Dallas", s1:[["Lionel Messi","38"],["Lionel Messi","90+5"]]},
+  {r:"G", d:"2026-06-22", g:"J", t1:"Jordan", t2:"Algeria", ft:[1,2], v:"San Francisco Bay Area", s1:[["Nizar Al-Rashdan","36"]], s2:[["Nadhir Benbouali","69"],["Amine Gouiri","82"]]},
+  {r:"G", d:"2026-06-27", g:"J", t1:"Algeria", t2:"Austria", ft:[3,3], v:"Kansas City", s1:[["Rafik Belghali","45"],["Riyad Mahrez","60"],["Riyad Mahrez","90+3"]], s2:[["Marko Arnautovic","28"],["Marcel Sabitzer","55"],["Sasa Kalajdzic","90+6"]]},
+  {r:"G", d:"2026-06-27", g:"J", t1:"Jordan", t2:"Argentina", ft:[1,3], v:"Dallas", s1:[["Mousa Al-Tamari","55"]], s2:[["Giovani Lo Celso","19"],["Lautaro Martínez","31","p"],["Lionel Messi","80"]]},
+  {r:"G", d:"2026-06-17", g:"K", t1:"Portugal", t2:"DR Congo", ft:[1,1], v:"Houston", s1:[["João Neves","6"]], s2:[["Yoane Wissa","45+5"]]},
+  {r:"G", d:"2026-06-17", g:"K", t1:"Uzbekistan", t2:"Colombia", ft:[1,3], v:"Mexico City", s1:[["Abbosbek Fayzullaev","60"]], s2:[["Daniel Muñoz","40"],["Luis Díaz","65"],["Jáminton Campaz","90+9"]]},
+  {r:"G", d:"2026-06-23", g:"K", t1:"Portugal", t2:"Uzbekistan", ft:[5,0], v:"Houston", s1:[["Cristiano Ronaldo","6"],["Cristiano Ronaldo","39"],["Nuno Mendes","17"],["Abduvohid Nematov","60","og"],["Rafael Leão","87"]]},
+  {r:"G", d:"2026-06-23", g:"K", t1:"Colombia", t2:"DR Congo", ft:[1,0], v:"Guadalajara", s1:[["Daniel Muñoz","76"]]},
+  {r:"G", d:"2026-06-27", g:"K", t1:"Colombia", t2:"Portugal", ft:[0,0], v:"Miami"},
+  {r:"G", d:"2026-06-27", g:"K", t1:"DR Congo", t2:"Uzbekistan", ft:[3,1], v:"Atlanta", s1:[["Yoane Wissa","68","p"],["Fiston Mayele","78"],["Yoane Wissa","90+1"]], s2:[["Eldor Shomurodov","10"]]},
+  {r:"G", d:"2026-06-17", g:"L", t1:"England", t2:"Croatia", ft:[4,2], v:"Dallas", s1:[["Harry Kane","12","p"],["Harry Kane","42"],["Jude Bellingham","47"],["Marcus Rashford","85"]], s2:[["Martin Baturina","36"],["Petar Musa","45+5"]]},
+  {r:"G", d:"2026-06-17", g:"L", t1:"Ghana", t2:"Panama", ft:[1,0], v:"Toronto", s1:[["Caleb Yirenkyi","90+5"]]},
+  {r:"G", d:"2026-06-23", g:"L", t1:"England", t2:"Ghana", ft:[0,0], v:"Boston"},
+  {r:"G", d:"2026-06-23", g:"L", t1:"Panama", t2:"Croatia", ft:[0,1], v:"Toronto", s2:[["Ante Budimir","54"]]},
+  {r:"G", d:"2026-06-27", g:"L", t1:"Panama", t2:"England", ft:[0,2], v:"New York/New Jersey", s2:[["Jude Bellingham","62"],["Harry Kane","67"]]},
+  {r:"G", d:"2026-06-27", g:"L", t1:"Croatia", t2:"Ghana", ft:[2,1], v:"Philadelphia", s1:[["Petar Sucic","31"],["Nikola Vlasic","83"]], s2:[["Derrick Luckassen","73"]]},
+  {r:"R32", d:"2026-06-28", t1:"South Africa", t2:"Canada", ft:[0,1], v:"Los Angeles", s2:[["Stephan Eustáquio","90+2"]]},
+  {r:"R32", d:"2026-06-29", t1:"Germany", t2:"Paraguay", ft:[1,1], et:[1,1], p:[3,4], v:"Boston", s1:[["Kai Havertz","54"]], s2:[["Julio Enciso","42"]]},
+  {r:"R32", d:"2026-06-29", t1:"Netherlands", t2:"Morocco", ft:[1,1], et:[1,1], p:[2,3], v:"Monterrey", s1:[["Cody Gakpo","72"]], s2:[["Issa Diop","90+1"]]},
+  {r:"R32", d:"2026-06-29", t1:"Brazil", t2:"Japan", ft:[2,1], v:"Houston", s1:[["Casemiro","56"],["Gabriel Martinelli","90+5"]], s2:[["Kaishu Sano","29"]]},
+  {r:"R32", d:"2026-06-30", t1:"France", t2:"Sweden", ft:[3,0], v:"New York/New Jersey", s1:[["Kylian Mbappé","45"],["Kylian Mbappé","74"],["Bradley Barcola","53"]]},
+  {r:"R32", d:"2026-06-30", t1:"Ivory Coast", t2:"Norway", ft:[1,2], v:"Dallas", s1:[["Amad Diallo","74"]], s2:[["Antonio Nusa","39"],["Erling Haaland","86"]]},
+  {r:"R32", d:"2026-06-30", t1:"Mexico", t2:"Ecuador", ft:[2,0], v:"Mexico City", s1:[["Julián Quiñones","31"],["Raúl Jiménez","45+1"]]},
+  {r:"R32", d:"2026-07-01", t1:"England", t2:"DR Congo", ft:[2,1], v:"Atlanta", s1:[["Harry Kane","75"],["Harry Kane","86"]], s2:[["Brian Cipenga","7"]]},
+  {r:"R32", d:"2026-07-01", t1:"USA", t2:"Bosnia & Herzegovina", ft:[2,0], v:"San Francisco Bay Area", s1:[["Folarin Balogun","45"],["Malik Tillman","82"]]},
+  {r:"R32", d:"2026-07-01", t1:"Belgium", t2:"Senegal", ft:[2,2], et:[3,2], v:"Seattle", s1:[["Romelu Lukaku","86"],["Youri Tielemans","89"],["Youri Tielemans","120+5","p"]], s2:[["Habib Diarra","25"],["Ismaïla Sarr","51"]]},
+  {r:"R32", d:"2026-07-02", t1:"Portugal", t2:"Croatia", ft:[2,1], v:"Toronto", s1:[["Cristiano Ronaldo","68","p"],["Gonçalo Ramos","90+4"]], s2:[["Ivan Perisic","53"]]},
+  {r:"R32", d:"2026-07-02", t1:"Spain", t2:"Austria", ft:[3,0], v:"Los Angeles", s1:[["Mikel Oyarzabal","36"],["Mikel Oyarzabal","89"],["Pedro Porro","66"]]},
+  {r:"R32", d:"2026-07-02", t1:"Switzerland", t2:"Algeria", ft:[2,0], v:"Vancouver", s1:[["Breel Embolo","10"],["Dan Ndoye","46"]]},
+  {r:"R32", d:"2026-07-03", t1:"Argentina", t2:"Cape Verde", ft:[1,1], et:[3,2], v:"Miami", s1:[["Lionel Messi","29"],["Lisandro Martínez","92"],["Diney Borges","111","og"]], s2:[["Deroy Duarte","59"],["Sidny Lopes Cabral","103"]]},
+  {r:"R32", d:"2026-07-03", t1:"Colombia", t2:"Ghana", ft:[1,0], v:"Kansas City", s1:[["Jhon Arias","14"]]},
+  {r:"R32", d:"2026-07-03", t1:"Australia", t2:"Egypt", ft:[1,1], et:[1,1], p:[2,4], v:"Dallas", s1:[["Mohamed Hany","55","og"]], s2:[["Emam Ashour","13"]]},
+  {r:"R16", d:"2026-07-04", t1:"Paraguay", t2:"France", ft:[0,1], v:"Philadelphia", s2:[["Kylian Mbappé","70","p"]]},
+  {r:"R16", d:"2026-07-04", t1:"Canada", t2:"Morocco", ft:[0,3], v:"Houston", s2:[["Azzedine Ounahi","50"],["Azzedine Ounahi","82"],["Soufiane Rahimi","90+8"]]},
+  {r:"R16", d:"2026-07-05", t1:"Brazil", t2:"Norway", ft:[1,2], v:"New York/New Jersey", s1:[["Neymar","90+10","p"]], s2:[["Erling Haaland","79"],["Erling Haaland","90"]]},
+  {r:"R16", d:"2026-07-05", t1:"Mexico", t2:"England", ft:[2,3], v:"Mexico City", s1:[["Julián Quiñones","42"],["Raúl Jiménez","69","p"]], s2:[["Jude Bellingham","36"],["Jude Bellingham","38"],["Harry Kane","60","p"]]},
+  {r:"R16", d:"2026-07-06", t1:"Portugal", t2:"Spain", ft:[0,1], v:"Dallas", s2:[["Mikel Merino","90+1"]]},
+  {r:"R16", d:"2026-07-06", t1:"USA", t2:"Belgium", ft:[1,4], v:"Seattle", s1:[["Malik Tillman","31"]], s2:[["Charles De Ketelaere","9"],["Charles De Ketelaere","33"],["Hans Vanaken","57"],["Romelu Lukaku","90+3"]]},
+  {r:"R16", d:"2026-07-07", t1:"Argentina", t2:"Egypt", ft:[3,2], v:"Atlanta", s1:[["Cristian Romero","79"],["Lionel Messi","83"],["Enzo Fernández","90+2"]], s2:[["Yasser Ibrahim","15"],["Mostafa Zico","67"]]},
+  {r:"R16", d:"2026-07-07", t1:"Switzerland", t2:"Colombia", ft:[0,0], et:[0,0], p:[4,3], v:"Vancouver"},
+  {r:"QF", d:"2026-07-09", t1:"France", t2:"Morocco", ft:[2,0], v:"Boston", s1:[["Kylian Mbappé","60"],["Ousmane Dembélé","66"]]},
+  {r:"QF", d:"2026-07-10", t1:"Spain", t2:"Belgium", ft:[2,1], v:"Los Angeles", s1:[["Fabián Ruiz","30"],["Mikel Merino","88"]], s2:[["Charles De Ketelaere","41"]]},
+  {r:"QF", d:"2026-07-11", t1:"Norway", t2:"England", ft:[1,1], et:[1,2], v:"Miami", s1:[["Andreas Schjelderup","36"]], s2:[["Jude Bellingham","45+2"],["Jude Bellingham","93"]]},
+  {r:"QF", d:"2026-07-11", t1:"Argentina", t2:"Switzerland", ft:[1,1], et:[3,1], v:"Kansas City", s1:[["Alexis Mac Allister","10"],["Julián Álvarez","112"],["Lautaro Martínez","120+1"]], s2:[["Dan Ndoye","67"]]},
+  {r:"SF", d:"2026-07-14", t1:"France", t2:"Spain", ft:[0,2], v:"Dallas", s2:[["Mikel Oyarzabal","22","p"],["Pedro Porro","58"]]},
+  {r:"SF", d:"2026-07-15", t1:"England", t2:"Argentina", ft:[1,2], v:"Atlanta", s1:[["Anthony Gordon","55"]], s2:[["Enzo Fernández","86"],["Lautaro Martínez","92"]]},
+  {r:"3RD", d:"2026-07-18", t1:"France", t2:"England", ft:[4,6], v:"Miami", s1:[["Kylian Mbappé","48"],["Bradley Barcola","54"],["Kylian Mbappé","66"],["Ousmane Dembélé","90+6"]], s2:[["Declan Rice","3"],["Ezri Konsa","18"],["Bukayo Saka","37"],["Bukayo Saka","45+1"],["Bukayo Saka","87","p"],["Jude Bellingham","90+8"]]},
+  {r:"F", d:"2026-07-19", t1:"Spain", t2:"Argentina", ft:[0,0], et:[1,0], v:"New York/New Jersey", s1:[["Ferran Torres","106"]]}
+];
+
+
+/* West Germany's titles belong to Germany when we count champions. */
+const NATION_ALIAS = { "West Germany": "Germany" };
+const canonicalNation = n => NATION_ALIAS[n] || n;
+
+
+/* ==================================================================
+   B. STORE — state management
+   ------------------------------------------------------------------
+   Deliberately built as (adapter + store) so Phase 2 is a one-line
+   change. The adapter is ASYNC even though localStorage is sync, so
+   swapping in Firestore / Supabase / your own API needs no rewrite:
+
+       const CloudAdapter = {
+         async load(){ return (await db.get(uid)).data; },
+         async save(s){ await db.set(uid, s); }
+       };
+       Store.use(CloudAdapter);
+
+   Nothing outside this block touches localStorage directly.
+   ================================================================== */
+const Store = (function () {
+  const KEY = "pitchperfect:v1";
+
+  /** Shape of persisted user data. Bump `version` if you migrate. */
+  const DEFAULTS = {
+    version: 1,
+    favouriteTeam: "",
+    stats: { currentStreak: 0, bestStreak: 0, totalSolved: 0, lastSolvedDate: null },
+    // Per-day play record, keyed by YYYY-MM-DD, e.g.
+    // "2026-08-07": { questionId: 3, solved: true, attempts: 2, revealed: false }
+    days: {}
+  };
+
+  /** Deep copy of plain-JSON state. (Not structuredClone — that needs
+      Safari 15.4+, and this app should run on older iPads too.) */
+  const clone = obj => JSON.parse(JSON.stringify(obj));
+
+  /** Default adapter: browser localStorage, wrapped in a promise API. */
+  const LocalAdapter = {
+    async load() {
+      try { return JSON.parse(localStorage.getItem(KEY) || "null"); }
+      catch { return null; }                       // private mode / corrupt JSON
+    },
+    async save(state) {
+      try { localStorage.setItem(KEY, JSON.stringify(state)); }
+      catch { /* storage full or blocked — app still works in-memory */ }
+    }
+  };
+
+  let adapter = LocalAdapter;
+  let state = clone(DEFAULTS);
+  const listeners = new Set();
+
+  function notify() { listeners.forEach(fn => fn(state)); }
+
+  return {
+    /** Swap the persistence layer (Phase 2 hook). */
+    use(newAdapter) { adapter = newAdapter; },
+
+    /** Subscribe to state changes; returns an unsubscribe function. */
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+
+    /** Read-only snapshot — callers must go through update() to write. */
+    get() { return state; },
+
+    async init() {
+      const saved = await adapter.load();
+      // Shallow-merge so new default keys appear for returning users.
+      if (saved && typeof saved === "object") {
+        state = { ...clone(DEFAULTS), ...saved,
+                  stats: { ...DEFAULTS.stats, ...(saved.stats || {}) },
+                  days:  { ...(saved.days || {}) } };
+      }
+      notify();
+      return state;
+    },
+
+    /** Apply a mutator function to state, persist, then notify. */
+    async update(mutator) {
+      mutator(state);
+      await adapter.save(state);
+      notify();
+      return state;
+    }
+  };
+})();
+
+
+/* ==================================================================
+   C. UTIL — date seeding, deterministic RNG, answer matching
+   ================================================================== */
+
+/** Today's local calendar date as "YYYY-MM-DD" (the daily seed). */
+function todayKey(d = new Date()) {
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/** "2026-08-07" → "Friday, 7 August" for display. */
+function prettyDate(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined,
+    { weekday: "long", day: "numeric", month: "long" });
+}
+
+/** xmur3 string hash → a well-mixed 32-bit seed. */
+function hashSeed(str) {
+  let h = 1779033703 ^ str.length;
+  for (let i = 0; i < str.length; i++) {
+    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 16), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^= h >>> 16) >>> 0;
+  };
+}
+
+/** mulberry32 PRNG — same seed always yields the same sequence. */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * THE DAILY QUESTION.
+ * Purely a function of the calendar date, so every device in the
+ * world that opens the app on 2026-08-07 sees the identical question —
+ * no server, no sync, no randomness at runtime.
+ */
+function questionForDate(dateKey) {
+  const rand = mulberry32(hashSeed("pitchperfect-" + dateKey)());
+  return TRIVIA[Math.floor(rand() * TRIVIA.length)];
+}
+
+/** Lowercase, strip accents/punctuation, collapse spaces. */
+function normalise(s) {
+  return String(s)
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")   // "españa" → "espana"
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\b(the|of|republic)\b/g, " ")             // "the netherlands" → "netherlands"
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Levenshtein distance, used to forgive a single typo. */
+function editDistance(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 2) return 99;
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1,
+                        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+
+/** Case-insensitive check against the answer, its aliases, and near-misses. */
+function isCorrect(guess, q) {
+  const g = normalise(guess);
+  if (!g) return false;
+  const candidates = [q.answer, ...(q.aliases || [])].map(normalise);
+  if (candidates.includes(g)) return true;
+  // Forgive one typo on longer answers ("Argentna" → Argentina).
+  return candidates.some(c => c.length >= 5 && editDistance(g, c) <= 1);
+}
+
+const $ = sel => document.querySelector(sel);
+
+
+/* ==================================================================
+   D. DAILY CHALLENGE
+   ================================================================== */
+const Daily = (function () {
+  const MAX_ATTEMPTS = 4;
+  let dateKey, question;
+
+  /** Fetch (or create) today's play record inside the store. */
+  function todayRecord() {
+    const days = Store.get().days;
+    if (!days[dateKey]) {
+      days[dateKey] = { questionId: question.id, solved: false, attempts: 0, revealed: false };
+    }
+    return days[dateKey];
+  }
+
+  /** Streak rules: solving today extends it only if yesterday was solved. */
+  function registerSolve() {
+    return Store.update(s => {
+      const rec = s.days[dateKey];
+      if (rec.solved) return;                       // guard against double-count
+      rec.solved = true;
+
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yKey = todayKey(yesterday);
+
+      s.stats.currentStreak = (s.stats.lastSolvedDate === yKey) ? s.stats.currentStreak + 1 : 1;
+      s.stats.bestStreak = Math.max(s.stats.bestStreak, s.stats.currentStreak);
+      s.stats.totalSolved += 1;
+      s.stats.lastSolvedDate = dateKey;
+    });
+  }
+
+  function say(kind, html) { $("#feedback").innerHTML = `<div class="feedback ${kind}">${html}</div>`; }
+
+  /** Lock the form once the day is finished (solved or given up). */
+  function lock() {
+    $("#guessInput").disabled = true;
+    $("#submitBtn").disabled = true;
+    $("#hintBtn").disabled = true;
+    $("#revealBtn").disabled = true;
+  }
+
+  function celebrate() {
+    const layer = document.createElement("div");
+    layer.className = "confetti";
+    const emojis = ["⚽", "🎉", "🏆", "🥅", "✨"];
+    for (let i = 0; i < 26; i++) {
+      const s = document.createElement("span");
+      s.textContent = emojis[i % emojis.length];
+      s.style.left = Math.random() * 100 + "vw";
+      s.style.animationDuration = (1.6 + Math.random() * 1.4) + "s";
+      s.style.animationDelay = (Math.random() * .35) + "s";
+      layer.appendChild(s);
+    }
+    document.body.appendChild(layer);
+    setTimeout(() => layer.remove(), 3400);
+  }
+
+  function onSubmit(e) {
+    e.preventDefault();
+    const rec = todayRecord();
+    if (rec.solved || rec.revealed) return;
+
+    const guess = $("#guessInput").value;
+    if (!normalise(guess)) return;
+
+    if (isCorrect(guess, question)) {
+      registerSolve().then(() => {
+        say("ok", `<span>🎉</span><div>Correct! The answer is <u>${question.answer}</u>.
+                   <small>Come back tomorrow for a new question.</small></div>`);
+        lock();
+        celebrate();
+        renderStats();
+      });
+      return;
+    }
+
+    // Wrong answer — count the attempt and nudge.
+    Store.update(s => { s.days[dateKey].attempts += 1; }).then(() => {
+      const left = MAX_ATTEMPTS - todayRecord().attempts;
+      const card = $(".fact-card");
+      card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake");
+
+      if (left <= 0) {
+        // One write: mark the day finished and break the streak together.
+        Store.update(s => {
+          s.days[dateKey].revealed = true;
+          s.stats.currentStreak = 0;
+        }).then(() => {
+          say("no", `<span>😔</span><div>Out of guesses. The answer was <u>${question.answer}</u>.
+                     <small>Your streak resets — but tomorrow is a fresh question.</small></div>`);
+          lock();
+          renderStats();
+        });
+      } else {
+        say("no", `<span>❌</span><div>Not quite — try again.
+                   <small>${left} guess${left === 1 ? "" : "es"} left. Tap 💡 Hint if you're stuck.</small></div>`);
+      }
+      $("#guessInput").select();
+    });
+  }
+
+  function onHint() {
+    const a = question.answer;
+    say("hint", `<span>💡</span><div>${question.hint}
+                 <small>Starts with “${a[0]}” · ${a.replace(/\s/g, "").length} letters</small></div>`);
+  }
+
+  function onReveal() {
+    Store.update(s => { s.days[dateKey].revealed = true; s.stats.currentStreak = 0; }).then(() => {
+      say("no", `<span>🏳️</span><div>The answer was <u>${question.answer}</u>.
+                 <small>${question.hint}</small></div>`);
+      lock();
+      renderStats();
+    });
+  }
+
+  /** Mirror stats into the three tiles and the header pill. */
+  function renderStats() {
+    const st = Store.get().stats;
+    $("#tStreak").textContent = st.currentStreak;
+    $("#tBest").textContent   = st.bestStreak;
+    $("#tSolved").textContent = st.totalSolved;
+    $("#streakNum").textContent = st.currentStreak;
+  }
+
+  /** Populate the favourite-team picker from the champions list. */
+  function renderFavourites() {
+    const teams = [...new Set(WORLD_CUPS.flatMap(t => [t.winner, t.runnerUp]).map(canonicalNation))].sort();
+    const sel = $("#favSelect");
+    sel.innerHTML = `<option value="">— none —</option>` +
+      teams.map(t => `<option value="${t}">${t}</option>`).join("");
+    sel.value = Store.get().favouriteTeam || "";
+
+    sel.addEventListener("change", () => {
+      Store.update(s => { s.favouriteTeam = sel.value; }).then(() => {
+        renderFavNote();
+        History.render();       // re-highlight that team's tournaments
+      });
+    });
+    renderFavNote();
+  }
+
+  function renderFavNote() {
+    const fav = Store.get().favouriteTeam;
+    const note = $("#favNote");
+    if (!fav) { note.textContent = "Pick a team to highlight their tournaments in World Cup History."; return; }
+    const titles = WORLD_CUPS.filter(t => canonicalNation(t.winner) === fav);
+    const finals = WORLD_CUPS.filter(t => canonicalNation(t.runnerUp) === fav);
+    note.innerHTML = titles.length
+      ? `🏆 <strong>${fav}</strong> — ${titles.length} title${titles.length > 1 ? "s" : ""}
+         (${titles.map(t => t.year).join(", ")}).`
+      : `<strong>${fav}</strong> — no titles yet${finals.length ? `, but ${finals.length} final${finals.length > 1 ? "s" : ""} reached` : ""}.`;
+  }
+
+  function init() {
+    dateKey  = todayKey();
+    question = questionForDate(dateKey);
+
+    $("#dailyDate").textContent = prettyDate(dateKey);
+    $("#factCat").textContent   = question.category;
+    $("#factText").textContent  = question.fact;
+
+    $("#guessForm").addEventListener("submit", onSubmit);
+    $("#hintBtn").addEventListener("click", onHint);
+    $("#revealBtn").addEventListener("click", onReveal);
+
+    // Restore today's state if the user already played on this device.
+    const rec = todayRecord();
+    if (rec.solved) {
+      say("ok", `<span>✅</span><div>Already solved today — the answer was <u>${question.answer}</u>.
+                 <small>A new question unlocks at midnight.</small></div>`);
+      lock();
+    } else if (rec.revealed) {
+      say("no", `<span>🏳️</span><div>Today's answer was <u>${question.answer}</u>.
+                 <small>A new question unlocks at midnight.</small></div>`);
+      lock();
+    }
+
+    renderStats();
+    renderFavourites();
+  }
+
+  return { init, renderStats };
+})();
+
+
+/* ==================================================================
+   E. HISTORY & STATS
+   ================================================================== */
+const History = (function () {
+  let search = "";
+  let filter = "all";       // "all" | "recent" | "fav" | a champion's name
+
+  /** Count titles per nation (West Germany folded into Germany). */
+  function titleCounts() {
+    const map = new Map();
+    WORLD_CUPS.forEach(t => {
+      const n = canonicalNation(t.winner);
+      map.set(n, (map.get(n) || 0) + 1);
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+
+  function renderSummary() {
+    const counts = titleCounts();
+    $("#sTournaments").textContent = WORLD_CUPS.length;
+    $("#sGoals").textContent = WORLD_CUPS.reduce((n, t) => n + t.totalGoals, 0).toLocaleString();
+    $("#sChampions").textContent = counts.length;
+  }
+
+  /** Ranked bar list — one series, one hue, shared baseline. */
+  function renderRanks() {
+    const counts = titleCounts();
+    const max = counts[0][1];
+    $("#rankList").innerHTML = counts.map(([name, n]) => `
+      <div class="rank-row">
+        <span class="rank-name">${name}</span>
+        <div class="rank-track"><div class="rank-bar" style="width:${(n / max) * 100}%"></div></div>
+        <span class="rank-val">${n}</span>
+      </div>`).join("");
+  }
+
+  function renderChips() {
+    const champs = titleCounts().map(([n]) => n);
+    const opts = [
+      { id: "all",    label: "All" },
+      { id: "recent", label: "Since 1998" },
+      { id: "fav",    label: "⭐ My team" },
+      ...champs.map(c => ({ id: c, label: c }))
+    ];
+    $("#chips").innerHTML = opts.map(o =>
+      `<button class="chip" data-filter="${o.id}" aria-pressed="${filter === o.id}">${o.label}</button>`
+    ).join("");
+  }
+
+  /** Apply the active chip + free-text search. */
+  function visibleCups() {
+    const fav = Store.get().favouriteTeam;
+    const q = normalise(search);
+
+    return WORLD_CUPS
+      .filter(t => {
+        if (filter === "recent") return t.year >= 1998;
+        if (filter === "fav")    return fav && (canonicalNation(t.winner) === fav || canonicalNation(t.runnerUp) === fav);
+        if (filter !== "all")    return canonicalNation(t.winner) === filter;
+        return true;
+      })
+      .filter(t => !q || normalise(
+        [t.year, t.host, t.winner, t.runnerUp, t.topScorer].join(" ")
+      ).includes(q))
+      .sort((a, b) => b.year - a.year);   // newest first
+  }
+
+  function render() {
+    const fav = Store.get().favouriteTeam;
+    const cups = visibleCups();
+    const list = $("#wcList");
+
+    if (!cups.length) {
+      list.innerHTML = `<p class="empty">No tournaments match that search.<br>Try “Brazil”, “1986” or “Pelé”.</p>`;
+      return;
+    }
+
+    list.innerHTML = cups.map(t => {
+      const isFav = fav && canonicalNation(t.winner) === fav;
+      return `
+      <button class="wc-card ${isFav ? "is-fav" : ""}" data-year="${t.year}"
+              aria-label="${t.year} World Cup, won by ${t.winner}">
+        <span class="wc-year">${t.year}</span>
+        <span class="wc-main">
+          <span class="wc-winner">${isFav ? "⭐" : "🏆"} ${t.winner}</span>
+          <span class="wc-sub">Hosted by ${t.host}</span>
+          <span class="wc-score">beat ${t.runnerUp} ${t.score}</span>
+        </span>
+        <span class="wc-caret" aria-hidden="true">›</span>
+      </button>`;
+    }).join("");
+
+    // Chip pressed-states stay in sync with `filter`.
+    document.querySelectorAll("#chips .chip").forEach(c =>
+      c.setAttribute("aria-pressed", String(c.dataset.filter === filter)));
+  }
+
+  /** Bottom-sheet detail view for one tournament. */
+  function openSheet(year) {
+    const t = WORLD_CUPS.find(x => x.year === year);
+    if (!t) return;
+
+    const scrim = document.createElement("div");
+    scrim.className = "sheet-scrim";
+    scrim.innerHTML = `
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="${t.year} World Cup">
+        <div class="grabber"></div>
+        <h2>🏆 ${t.winner} <span style="color:var(--ink-3);font-weight:700">${t.year}</span></h2>
+        <p class="host">Hosted by ${t.host} · ${t.teams} teams</p>
+        <dl class="kv">
+          <div><dt>Champion</dt>     <dd>${t.winner}</dd></div>
+          <div><dt>Runner-up</dt>    <dd>${t.runnerUp}</dd></div>
+          <div><dt>Final score</dt>  <dd>${t.score}</dd></div>
+          <div><dt>Top scorer</dt>   <dd>${t.topScorer} (${t.goals})</dd></div>
+          <div><dt>Matches</dt>      <dd>${t.matches}</dd></div>
+          <div><dt>Total goals</dt>  <dd>${t.totalGoals}</dd></div>
+          <div><dt>Goals per game</dt><dd>${(t.totalGoals / t.matches).toFixed(2)}</dd></div>
+        </dl>
+        <p class="trophy-note">${t.note}</p>
+        <button class="btn btn-ghost" data-close>Close</button>
+      </div>`;
+
+    const close = () => { scrim.remove(); document.body.style.overflow = ""; };
+    scrim.addEventListener("click", e => {
+      if (e.target === scrim || e.target.hasAttribute("data-close")) close();
+    });
+    document.addEventListener("keydown", function esc(e) {
+      if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
+    });
+
+    document.body.style.overflow = "hidden";   // don't scroll the page behind the sheet
+    document.body.appendChild(scrim);
+  }
+
+  function init() {
+    renderSummary();
+    renderRanks();
+    renderChips();
+    render();
+
+    $("#searchInput").addEventListener("input", e => { search = e.target.value; render(); });
+
+    $("#chips").addEventListener("click", e => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      filter = chip.dataset.filter;
+      render();
+    });
+
+    // Event delegation: cards are re-rendered constantly, the list isn't.
+    $("#wcList").addEventListener("click", e => {
+      const card = e.target.closest(".wc-card");
+      if (card) openSheet(Number(card.dataset.year));
+    });
+  }
+
+  return { init, render };
+})();
+
+
+/* ==================================================================
+   E2. WORLD CUP 2026 — results browser
+   ================================================================== */
+const Cup2026 = (function () {
+  let stage = "G";     // "G" | "R32" | "R16" | "QF" | "SF" | "F"
+  let group = "A";     // active group letter when stage === "G"
+
+  const STAGES = [
+    { id: "G",   label: "Groups" },
+    { id: "R32", label: "Round of 32" },
+    { id: "R16", label: "Round of 16" },
+    { id: "QF",  label: "Quarter-finals" },
+    { id: "SF",  label: "Semi-finals" },
+    { id: "F",   label: "Final" }
+  ];
+  const GROUPS = ["A","B","C","D","E","F","G","H","I","J","K","L"];
+
+  const flag   = t => FLAG[t] || "🏳️";
+  /** Decisive score: extra time if played, otherwise full time. */
+  const result = m => m.et || m.ft;
+
+  /** 1 = team1 won, 2 = team2 won, 0 = drawn (group stage only). */
+  function winnerOf(m) {
+    if (m.p) return m.p[0] > m.p[1] ? 1 : 2;      // shoot-out decides
+    const r = result(m);
+    return r[0] > r[1] ? 1 : (r[1] > r[0] ? 2 : 0);
+  }
+
+  /* Teams that actually reached the Round of 32. Using the real match
+     list means best-third-placed qualification is exactly right without
+     re-implementing FIFA's ranking rules. */
+  const QUALIFIED = new Set(
+    WC2026_MATCHES.filter(m => m.r === "R32").flatMap(m => [m.t1, m.t2])
+  );
+
+  /** Build a group table from that group's six matches. */
+  function standings(letter) {
+    const rows = {};
+    const row = t => (rows[t] = rows[t] || { team: t, p:0, w:0, d:0, l:0, gf:0, ga:0, pts:0 });
+
+    WC2026_MATCHES.filter(m => m.r === "G" && m.g === letter).forEach(m => {
+      const [x, y] = m.ft;
+      [[m.t1, x, y], [m.t2, y, x]].forEach(([t, f, a]) => {
+        const r = row(t);
+        r.p++; r.gf += f; r.ga += a;
+        if (f > a) { r.w++; r.pts += 3; } else if (f === a) { r.d++; r.pts++; } else r.l++;
+      });
+    });
+
+    // Points → goal difference → goals scored → name.
+    return Object.values(rows).sort((a, b) =>
+      b.pts - a.pts || (b.gf - b.ga) - (a.gf - a.ga) || b.gf - a.gf || a.team.localeCompare(b.team));
+  }
+
+  /** Tournament top scorers (own goals excluded, as FIFA counts them). */
+  function topScorers(limit = 10) {
+    const tally = {};
+    WC2026_MATCHES.forEach(m => {
+      [[m.s1, m.t1], [m.s2, m.t2]].forEach(([list, team]) => {
+        (list || []).forEach(([name, , flagCode]) => {
+          if (flagCode === "og") return;
+          tally[name] = tally[name] || { name, team, goals: 0 };
+          tally[name].goals++;
+        });
+      });
+    });
+    return Object.values(tally).sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name))
+                               .slice(0, limit);
+  }
+
+  /** One match row. `i` indexes WC2026_MATCHES so the sheet can find it. */
+  function matchRow(m, i) {
+    const r = result(m), w = winnerOf(m);
+    const badges =
+      (m.p  ? `<span class="badge pens">Pens ${m.p[0]}–${m.p[1]}</span>` : "") +
+      (m.et && !m.p ? `<span class="badge">a.e.t.</span>` : "");
+    const cls = n => m.r === "G" ? "" : (w === 0 ? "" : (w === n ? "win" : "lose"));
+
+    return `
+      <button class="match" data-i="${i}" aria-label="${m.t1} ${r[0]}–${r[1]} ${m.t2}">
+        <span class="m-team ${cls(1)}"><span class="fl">${flag(m.t1)}</span><span class="nm">${m.t1}</span></span>
+        <span class="m-score">${r[0]}–${r[1]}</span>
+        <span class="m-team right ${cls(2)}"><span class="nm">${m.t2}</span><span class="fl">${flag(m.t2)}</span></span>
+        <span class="m-meta">${badges}<span>${fmtDate(m.d)}</span><span>· ${m.v}</span></span>
+      </button>`;
+  }
+
+  /** "2026-07-19" → "19 Jul" */
+  function fmtDate(iso) {
+    const [y, mo, d] = iso.split("-").map(Number);
+    return new Date(y, mo - 1, d).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  }
+
+  function renderHero() {
+    $("#champFlag").textContent = flag(WC2026.champion);
+    $("#champName").textContent = WC2026.champion;
+    $("#champSub").textContent  = `Champions · ${WC2026.dates} · ${WC2026.host}`;
+    const f = WC2026_MATCHES.find(m => m.r === "F");
+    $("#champFinal").innerHTML =
+      `Final · ${flag(f.t1)} ${f.t1} ${result(f)[0]}–${result(f)[1]} ${f.t2} ${flag(f.t2)} (a.e.t.)<br>
+       <span style="font-weight:700">${WC2026.third} finished third, ${WC2026.fourth} fourth</span>`;
+    $("#c26Matches").textContent = WC2026.matches;
+    $("#c26Goals").textContent   = WC2026.totalGoals;
+
+    $("#awards").innerHTML = WC2026.awards.map(a => `
+      <div class="award">
+        <div class="al">${a.label}</div>
+        <div class="an">${a.name}</div>
+        <div class="ad">${a.detail}</div>
+      </div>`).join("");
+  }
+
+  /** Ranked bar list — one series, one hue, shared baseline. */
+  function renderScorers() {
+    const list = topScorers(10), max = list[0].goals;
+    $("#scorerList").innerHTML = list.map(s => `
+      <div class="rank-row">
+        <span class="rank-name">${flag(s.team)} ${s.name}</span>
+        <div class="rank-track"><div class="rank-bar" style="width:${(s.goals / max) * 100}%"></div></div>
+        <span class="rank-val">${s.goals}</span>
+      </div>`).join("");
+  }
+
+  function renderStageChips() {
+    $("#stageSeg").innerHTML = STAGES.map(s =>
+      `<button class="chip" data-stage="${s.id}" aria-pressed="${stage === s.id}">${s.label}</button>`).join("");
+    $("#groupChipsWrap").innerHTML = stage !== "G" ? "" :
+      GROUPS.map(g => `<button class="chip" data-group="${g}" aria-pressed="${group === g}">${g}</button>`).join("");
+    $("#groupChipsWrap").style.display = stage === "G" ? "" : "none";
+  }
+
+  function renderBody() {
+    const body = $("#stageBody");
+
+    if (stage === "G") {
+      const table = standings(group);
+      const games = WC2026_MATCHES
+        .map((m, i) => [m, i])
+        .filter(([m]) => m.r === "G" && m.g === group);
+
+      body.innerHTML = `
+        <div class="card">
+          <h3 style="font-size:17px;margin-bottom:14px">Group ${group}</h3>
+          <table class="grp-table">
+            <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GF</th><th>GA</th><th>Pts</th></tr></thead>
+            <tbody>
+              ${table.map((r, i) => `
+                <tr class="${QUALIFIED.has(r.team) ? "qualified" : ""}">
+                  <td><span class="grp-team"><span class="pos">${i + 1}</span><span class="fl">${flag(r.team)}</span>${r.team}</span></td>
+                  <td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td>
+                  <td>${r.gf}</td><td>${r.ga}</td><td>${r.pts}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+          <p class="grp-legend">Green = advanced to the Round of 32 (top two, plus the eight best third-placed teams).</p>
+        </div>
+        <div class="rnd-head">Group ${group} matches</div>
+        ${games.map(([m, i]) => matchRow(m, i)).join("")}`;
+      return;
+    }
+
+    // Knockout stages. The Final tab also shows the third-place play-off.
+    const rounds = stage === "F" ? ["3RD", "F"] : [stage];
+    const titles = { R32:"Round of 32", R16:"Round of 16", QF:"Quarter-finals",
+                     SF:"Semi-finals", "3RD":"Third-place play-off", F:"Final" };
+
+    body.innerHTML = rounds.map(r => {
+      const games = WC2026_MATCHES.map((m, i) => [m, i]).filter(([m]) => m.r === r);
+      return `<div class="rnd-head">${titles[r]}</div>` + games.map(([m, i]) => matchRow(m, i)).join("");
+    }).join("");
+  }
+
+  /** Match detail sheet: full scoreline plus every goal. */
+  function openMatchSheet(i) {
+    const m = WC2026_MATCHES[i];
+    if (!m) return;
+    const r = result(m);
+
+    // Merge both teams' goals into one timeline.
+    const goals = [
+      ...(m.s1 || []).map(g => ({ name: g[0], min: g[1], tag: g[2], team: m.t1 })),
+      ...(m.s2 || []).map(g => ({ name: g[0], min: g[1], tag: g[2], team: m.t2 }))
+    ].sort((a, b) => parseInt(a.min, 10) - parseInt(b.min, 10));
+
+    const label = { G:"Group " + m.g, R32:"Round of 32", R16:"Round of 16", QF:"Quarter-final",
+                    SF:"Semi-final", "3RD":"Third-place play-off", F:"Final" }[m.r];
+
+    const scrim = document.createElement("div");
+    scrim.className = "sheet-scrim";
+    scrim.innerHTML = `
+      <div class="sheet" role="dialog" aria-modal="true" aria-label="${m.t1} versus ${m.t2}">
+        <div class="grabber"></div>
+        <p class="eyebrow">${label} · ${fmtDate(m.d)}</p>
+        <h2 style="margin:6px 0 2px">${flag(m.t1)} ${m.t1} ${r[0]}–${r[1]} ${m.t2} ${flag(m.t2)}</h2>
+        <p class="host">${m.v}${m.et ? " · after extra time" : ""}${m.p ? ` · ${m.t1} ${m.p[0]}–${m.p[1]} ${m.t2} on penalties` : ""}</p>
+        ${m.et ? `<p class="wc-score" style="margin:-10px 0 0">90 minutes: ${m.ft[0]}–${m.ft[1]}</p>` : ""}
+        ${goals.length ? `<div class="goals">${goals.map(g => `
+            <div class="goal">
+              <span class="min">${g.min}'</span>
+              <span class="who">${flag(g.team)} ${g.name}</span>
+              ${g.tag === "og" ? `<span class="tag">own goal</span>` : ""}
+              ${g.tag === "p"  ? `<span class="tag">penalty</span>`  : ""}
+            </div>`).join("")}</div>`
+          : `<p class="grp-legend" style="margin-top:16px">Goalless.</p>`}
+        <button class="btn btn-ghost" data-close>Close</button>
+      </div>`;
+
+    const close = () => { scrim.remove(); document.body.style.overflow = ""; };
+    scrim.addEventListener("click", e => {
+      if (e.target === scrim || e.target.hasAttribute("data-close")) close();
+    });
+    document.addEventListener("keydown", function esc(e) {
+      if (e.key === "Escape") { close(); document.removeEventListener("keydown", esc); }
+    });
+    document.body.style.overflow = "hidden";
+    document.body.appendChild(scrim);
+  }
+
+  function init() {
+    renderHero();
+    renderScorers();
+    renderStageChips();
+    renderBody();
+
+    $("#stageSeg").addEventListener("click", e => {
+      const chip = e.target.closest("[data-stage]");
+      if (!chip) return;
+      stage = chip.dataset.stage;
+      renderStageChips(); renderBody();
+    });
+
+    $("#groupChipsWrap").addEventListener("click", e => {
+      const chip = e.target.closest("[data-group]");
+      if (!chip) return;
+      group = chip.dataset.group;
+      renderStageChips(); renderBody();
+    });
+
+    // Delegated: match rows are re-rendered on every stage change.
+    $("#stageBody").addEventListener("click", e => {
+      const row = e.target.closest(".match");
+      if (row) openMatchSheet(Number(row.dataset.i));
+    });
+  }
+
+  return { init };
+})();
+
+
+/* ==================================================================
+   F. ROUTER & BOOT
+   ================================================================== */
+function showView(name) {
+  document.querySelectorAll(".view").forEach(v => {
+    v.hidden = v.id !== "view-" + name;
+  });
+  document.querySelectorAll(".tabbar button").forEach(b => {
+    b.setAttribute("aria-selected", String(b.dataset.view === name));
+  });
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  location.hash = name;                       // deep-linkable / survives reload
+}
+
+document.querySelector(".tabbar").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-view]");
+  if (btn) showView(btn.dataset.view);
+});
+
+const VIEWS = ["daily", "wc2026", "history"];
+
+(async function boot() {
+  await Store.init();                         // load saved progress first
+  Daily.init();
+  Cup2026.init();
+  History.init();
+  const wanted = location.hash.replace("#", "");
+  showView(VIEWS.includes(wanted) ? wanted : "daily");
+})();
+
+/* If the app sits open past midnight, refresh so the new day's
+   question appears without the user having to reload manually. */
+setInterval(() => {
+  if (todayKey() !== $("#dailyDate").dataset.key) {
+    $("#dailyDate").dataset.key = todayKey();
+    location.reload();
+  }
+}, 60_000);
+document.getElementById("dailyDate").dataset.key = todayKey();
+</script>
+</body>
+</html>
