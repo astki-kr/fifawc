@@ -151,14 +151,15 @@ main{
   border-top:1px solid var(--border);
 }
 .tabbar button{
-  flex:1; max-width:220px;
+  flex:1; max-width:170px; min-width:0;
   min-height:52px;                 /* generous iPad-friendly touch target */
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
   border-radius:14px;
-  color:var(--ink-3); font-size:11px; font-weight:700; letter-spacing:.01em;
+  color:var(--ink-3); font-size:10.5px; font-weight:700; letter-spacing:0;
+  white-space:nowrap;
   transition:background .18s, color .18s;
 }
-.tabbar button .ico{ font-size:21px; line-height:1; }
+.tabbar button .ico{ font-size:20px; line-height:1; }
 .tabbar button[aria-selected="true"]{ color:var(--accent); background:var(--accent-soft); }
 .tabbar button:active{ transform:scale(.97); }
 
@@ -407,7 +408,33 @@ main{
 .sheet .btn-ghost{ width:100%; margin-top:16px; }
 
 /* ============================================================
-   8. WORLD CUP 2026
+   8. COUNTRY STREAK
+   ============================================================ */
+.streak-idle{ text-align:center; }
+.streak-emoji{ font-size:52px; line-height:1; margin-bottom:6px; }
+.record-date{
+  font-size:13px; font-weight:700; color:var(--gold);
+  background:var(--gold-soft); border:1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius:12px; padding:10px 14px; margin:0 0 16px;
+}
+.streak-bar{
+  display:flex; align-items:center; justify-content:space-between;
+  margin:0 4px 12px;
+}
+.streak-count{
+  font-size:26px; font-weight:800; letter-spacing:-.02em;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.streak-best{ font-size:13px; font-weight:700; color:var(--ink-3); }
+.streak-flash{
+  height:0; overflow:hidden; opacity:0;
+  color:var(--good); font-weight:800; font-size:15px;
+  transition:opacity .2s, height .2s;
+}
+.streak-flash.show{ height:26px; opacity:1; }
+
+/* ============================================================
+   9. WORLD CUP 2026
    ============================================================ */
 .champ-hero{ text-align:center; position:relative; overflow:hidden; }
 .champ-hero::after{
@@ -561,7 +588,12 @@ tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); 
     </div>
   </section>
 
-  <!-- ========== VIEW 2: WORLD CUP 2026 ========== -->
+  <!-- ========== VIEW 2: COUNTRY STREAK ========== -->
+  <section class="view" id="view-streak" role="tabpanel" aria-label="Country Streak" hidden>
+    <div id="streakBody"></div>
+  </section>
+
+  <!-- ========== VIEW 3: WORLD CUP 2026 ========== -->
   <section class="view" id="view-wc2026" role="tabpanel" aria-label="World Cup 2026" hidden>
 
     <!-- Champion hero -->
@@ -620,6 +652,9 @@ tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); 
 <nav class="tabbar" role="tablist" aria-label="Main">
   <button role="tab" data-view="daily"   aria-selected="true">
     <span class="ico">🎯</span> Daily
+  </button>
+  <button role="tab" data-view="streak"  aria-selected="false">
+    <span class="ico">🔥</span> Streak
   </button>
   <button role="tab" data-view="wc2026"  aria-selected="false">
     <span class="ico">🌎</span> WC 2026
@@ -1074,6 +1109,8 @@ const Store = (function () {
     version: 1,
     favouriteTeam: "",
     stats: { currentStreak: 0, bestStreak: 0, totalSolved: 0, lastSolvedDate: null },
+    // Country Streak mode: personal best, the date it was set, and run count.
+    streakGame: { best: 0, bestDate: null, plays: 0, lastPlayed: null },
     // Per-day play record, keyed by YYYY-MM-DD, e.g.
     // "2026-08-07": { questionId: 3, solved: true, attempts: 2, revealed: false }
     days: {}
@@ -1116,7 +1153,8 @@ const Store = (function () {
       // Shallow-merge so new default keys appear for returning users.
       if (saved && typeof saved === "object") {
         state = { ...clone(DEFAULTS), ...saved,
-                  stats: { ...DEFAULTS.stats, ...(saved.stats || {}) },
+                  stats:      { ...DEFAULTS.stats,      ...(saved.stats || {}) },
+                  streakGame: { ...DEFAULTS.streakGame, ...(saved.streakGame || {}) },
                   days:  { ...(saved.days || {}) } };
       }
       notify();
@@ -1820,7 +1858,269 @@ const Cup2026 = (function () {
     });
   }
 
-  return { init };
+  // standings/winnerOf are also used by the Country Streak generator.
+  return { init, standings, winnerOf, GROUPS };
+})();
+
+
+/* ==================================================================
+   E3. COUNTRY STREAK — endless "guess the country" run
+   ------------------------------------------------------------------
+   Questions are generated from the real 2026 match data, so the pool
+   is large enough for a long run and every answer is verifiable.
+   Difficulty ramps as the streak grows: gentle questions first, the
+   obscure one-goal scorers only once you are past 12.
+   ================================================================== */
+const StreakGame = (function () {
+  let pool = [];             // generated question bank
+  let asked = new Set();     // indexes used in the current run
+  let current = null;
+  let streak = 0;
+  let phase = "idle";        // "idle" | "playing" | "over"
+  let lastAnswer = null;     // the answer that ended the run
+  let newRecord = false;
+
+  /* Accepted spellings per country, on top of the exact name. The
+     normalise() helper already strips accents and the words
+     the/of/republic, so these only cover genuinely different names. */
+  const TEAM_ALIASES = {
+    "USA": ["united states", "united states of america", "america", "us"],
+    "South Korea": ["korea", "korea republic", "s korea"],
+    "Netherlands": ["holland", "nederland"],
+    "Ivory Coast": ["cote divoire", "cote d ivoire", "côte d'ivoire"],
+    "Bosnia & Herzegovina": ["bosnia", "bosnia and herzegovina", "bosnia herzegovina"],
+    "DR Congo": ["congo", "drc", "democratic congo", "democratic congo"],
+    "Cape Verde": ["cabo verde"],
+    "Czech Republic": ["czechia"],
+    "Turkey": ["turkiye", "türkiye"],
+    "Spain": ["espana", "españa"],
+    "Germany": ["deutschland"],
+    "Mexico": ["méxico"],
+    "Morocco": ["maroc"],
+    "Belgium": ["belgique", "belgie", "belgië"],
+    "Switzerland": ["suisse", "schweiz", "svizzera"],
+    "Curaçao": ["curacao"],
+    "Saudi Arabia": ["saudi", "ksa"],
+    "South Africa": ["rsa"],
+    "New Zealand": ["nz"]
+  };
+  const aliasesFor = team => TEAM_ALIASES[team] || [];
+
+  const ROUND_NAME = { R32:"Round of 32", R16:"Round of 16", QF:"quarter-finals",
+                       SF:"semi-finals", "3RD":"third-place play-off", F:"final" };
+
+  /** Build the question bank once, from the embedded 2026 results. */
+  function buildPool() {
+    const out = [];
+    const add = (fact, answer, category, d) =>
+      out.push({ fact, answer, aliases: aliasesFor(answer), category, d,
+                 hint: `Starts with “${answer[0]}” · ${answer.replace(/\s/g, "").length} letters` });
+
+    // 1. The hand-written facts (easiest, most recognisable).
+    TRIVIA_2026.forEach(t => out.push({ ...t, d: 1 }));
+
+    // 2. Group winners.
+    Cup2026.GROUPS.forEach(g => {
+      const top = Cup2026.standings(g)[0];
+      add(`Which country won Group ${g} at the 2026 World Cup?`, top.team, "2026 Groups", 1);
+    });
+
+    // 3. Knockout eliminations — a team is knocked out exactly once,
+    //    so the answer is always unique.
+    WC2026_MATCHES.filter(m => m.r !== "G" && m.r !== "3RD").forEach(m => {
+      const w = Cup2026.winnerOf(m);
+      const won  = w === 1 ? m.t1 : m.t2;
+      const lost = w === 1 ? m.t2 : m.t1;
+      const fact = m.r === "F"
+        ? `Which country beat ${lost} in the 2026 World Cup final?`
+        : `Which country knocked ${lost} out of the 2026 World Cup in the ${ROUND_NAME[m.r]}?`;
+      add(fact, won, "2026 Knockouts", m.r === "R32" ? 2 : 1);
+    });
+
+    // 4. Goalscorers → country. Only players mapping to a single team
+    //    are used, so there is never an ambiguous answer.
+    const byPlayer = {};
+    WC2026_MATCHES.forEach(m => {
+      [[m.s1, m.t1], [m.s2, m.t2]].forEach(([list, team]) => {
+        (list || []).forEach(([name, , tag]) => {
+          if (tag === "og") return;                    // own goals belong to the opponent
+          const p = byPlayer[name] = byPlayer[name] || { teams: new Set(), goals: 0, ko: false };
+          p.teams.add(team); p.goals++;
+          if (m.r !== "G") p.ko = true;
+        });
+      });
+    });
+    Object.entries(byPlayer).forEach(([name, p]) => {
+      if (p.teams.size !== 1) return;                  // ambiguous — skip
+      const team = [...p.teams][0];
+      // Famous first: many goals = easy, a single group-stage goal = hard.
+      const d = p.goals >= 4 ? 1 : (p.goals >= 2 || p.ko ? 2 : 3);
+      const tally = p.goals === 1 ? "scored at the 2026 World Cup" : `scored ${p.goals} goals at the 2026 World Cup`;
+      add(`${name} ${tally} — for which country?`, team, "2026 Scorers", d);
+    });
+
+    return out;
+  }
+
+  /** Difficulty unlocks as the run gets longer. */
+  function maxDifficulty() { return streak < 5 ? 1 : (streak < 12 ? 2 : 3); }
+
+  /** Pick an unasked question at or below the current difficulty. */
+  function nextQuestion() {
+    const cap = maxDifficulty();
+    let eligible = pool.map((q, i) => i).filter(i => !asked.has(i) && pool[i].d <= cap);
+    if (!eligible.length) {                            // exhausted — allow repeats
+      asked.clear();
+      eligible = pool.map((q, i) => i).filter(i => pool[i].d <= cap);
+    }
+    const idx = eligible[Math.floor(Math.random() * eligible.length)];
+    asked.add(idx);
+    current = pool[idx];
+  }
+
+  /** Persist a new personal best, stamped with the date it happened. */
+  function saveRecord() {
+    return Store.update(s => {
+      const g = s.streakGame;
+      g.plays += 1;
+      g.lastPlayed = todayKey();
+      if (streak > g.best) { g.best = streak; g.bestDate = todayKey(); newRecord = true; }
+    });
+  }
+
+  function start() {
+    streak = 0; asked.clear(); newRecord = false; lastAnswer = null;
+    phase = "playing";
+    nextQuestion();
+    render();
+  }
+
+  function submit(guess) {
+    if (phase !== "playing") return;
+    if (!normalise(guess)) return;
+
+    if (isCorrect(guess, current)) {
+      streak += 1;
+      nextQuestion();
+      render();
+      flash(`Correct! 🔥 ${streak}`);
+    } else {
+      lastAnswer = current.answer;
+      phase = "over";
+      saveRecord().then(render);
+    }
+  }
+
+  /** Brief toast above the input, so the run keeps its rhythm. */
+  function flash(msg) {
+    const el = $("#streakFlash");
+    if (!el) return;
+    el.textContent = msg;
+    el.className = "streak-flash show";
+    setTimeout(() => { el.className = "streak-flash"; }, 900);
+  }
+
+  function record() {
+    const g = Store.get().streakGame;
+    if (!g.best) return `<p class="wc-sub">No record yet — this run sets it.</p>`;
+    return `<p class="wc-sub">Best streak <strong>${g.best}</strong>${
+      g.bestDate ? ` · set on ${prettyDate(g.bestDate)}` : ""}</p>`;
+  }
+
+  function render() {
+    const body = $("#streakBody");
+    const g = Store.get().streakGame;
+
+    if (phase === "idle") {
+      body.innerHTML = `
+        <div class="card streak-idle">
+          <div class="streak-emoji">🔥</div>
+          <h2 style="font-size:24px">Country Streak</h2>
+          <p class="wc-sub" style="margin:8px 0 0">
+            Endless questions on the 2026 World Cup. Name the country to keep the run alive —
+            one wrong answer ends it. Questions get harder the further you go.</p>
+          <div class="tiles" style="margin:18px 0">
+            <div class="tile"><span class="n">${g.best}</span><span class="l">Best streak</span></div>
+            <div class="tile"><span class="n">${g.plays}</span><span class="l">Runs</span></div>
+            <div class="tile"><span class="n">${pool.length}</span><span class="l">Questions</span></div>
+          </div>
+          ${g.bestDate ? `<p class="record-date">🏅 Record set on ${prettyDate(g.bestDate)}</p>` : ""}
+          <button class="btn btn-primary" data-act="start">Start streak</button>
+        </div>`;
+      return;
+    }
+
+    if (phase === "playing") {
+      body.innerHTML = `
+        <div class="streak-bar">
+          <span class="streak-count">🔥 ${streak}</span>
+          <span class="streak-best">Best ${g.best}</span>
+        </div>
+        <div class="card fact-card">
+          <span class="fact-cat">${current.category}</span>
+          <p class="fact-text">${current.fact}</p>
+          <div class="streak-flash" id="streakFlash"></div>
+          <form class="guess-row" id="streakForm" autocomplete="off">
+            <input class="guess-input" id="streakInput" type="text" placeholder="Which country?"
+                   aria-label="Your guess" autocapitalize="words" autocorrect="off"
+                   spellcheck="false" enterkeyhint="send">
+            <button class="btn btn-primary" type="submit">Submit</button>
+          </form>
+          <div class="helper-row">
+            <button class="btn btn-ghost" data-act="hint">💡 Hint</button>
+            <button class="btn btn-ghost" data-act="quit">End run</button>
+          </div>
+          <div id="streakHint"></div>
+        </div>`;
+      const input = $("#streakInput");
+      if (input) input.focus();
+      return;
+    }
+
+    // phase === "over"
+    body.innerHTML = `
+      <div class="card streak-idle">
+        <div class="streak-emoji">${newRecord ? "🏆" : "🔚"}</div>
+        <h2 style="font-size:24px">${newRecord ? "New record!" : "Run over"}</h2>
+        <p class="wc-sub" style="margin:8px 0 0">
+          ${lastAnswer ? `The answer was <strong>${lastAnswer}</strong>.` : "You ended the run."}</p>
+        <div class="tiles" style="margin:18px 0">
+          <div class="tile" style="${newRecord ? "border-color:var(--gold)" : ""}">
+            <span class="n">${streak}</span><span class="l">This run</span></div>
+          <div class="tile"><span class="n">${g.best}</span><span class="l">Best</span></div>
+          <div class="tile"><span class="n">${g.plays}</span><span class="l">Runs</span></div>
+        </div>
+        ${g.bestDate ? `<p class="record-date">🏅 Record of ${g.best} set on ${prettyDate(g.bestDate)}</p>` : ""}
+        <button class="btn btn-primary" data-act="start">Play again</button>
+      </div>`;
+  }
+
+  function init() {
+    pool = buildPool();
+    render();
+
+    // One delegated listener on the container survives every re-render.
+    $("#streakBody").addEventListener("click", e => {
+      const act = e.target.closest("[data-act]");
+      if (!act) return;
+      if (act.dataset.act === "start") start();
+      if (act.dataset.act === "quit")  { lastAnswer = null; phase = "over"; saveRecord().then(render); }
+      if (act.dataset.act === "hint")  {
+        $("#streakHint").innerHTML = `<div class="feedback hint"><span>💡</span><div>${current.hint}</div></div>`;
+      }
+    });
+
+    $("#streakBody").addEventListener("submit", e => {
+      e.preventDefault();
+      const input = $("#streakInput");
+      if (!input) return;
+      const guess = input.value;
+      input.value = "";
+      submit(guess);
+    });
+  }
+
+  return { init, buildPool };
 })();
 
 
@@ -1843,12 +2143,13 @@ document.querySelector(".tabbar").addEventListener("click", e => {
   if (btn) showView(btn.dataset.view);
 });
 
-const VIEWS = ["daily", "wc2026", "history"];
+const VIEWS = ["daily", "streak", "wc2026", "history"];
 
 (async function boot() {
   await Store.init();                         // load saved progress first
   Daily.init();
   Cup2026.init();
+  StreakGame.init();
   History.init();
   const wanted = location.hash.replace("#", "");
   showView(VIEWS.includes(wanted) ? wanted : "daily");

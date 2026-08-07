@@ -23,6 +23,14 @@ Answers are matched case-insensitively, with accent stripping (`España` → Spa
 common aliases (`Holland`, `USA`, `Korea Republic`) and one-typo tolerance.
 Tracks your streak, best streak and total solved.
 
+### 🔥 Country Streak
+An endless run: keep naming countries correctly and the streak grows — one wrong
+answer ends it. Questions are **generated from the real 2026 match data** (241 of
+them, spanning 47 countries), so no two runs feel the same. Difficulty ramps as you
+go: recognisable facts first, then knockout results, and finally the single-goal
+scorers once you pass a streak of 12. Your best streak is saved **along with the
+date you set it**.
+
 ### 🌎 World Cup 2026
 Complete results for **all 104 matches** of the Canada / Mexico / USA tournament:
 
