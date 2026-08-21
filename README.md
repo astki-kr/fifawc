@@ -31,6 +31,18 @@ go: recognisable facts first, then knockout results, and finally the single-goal
 scorers once you pass a streak of 12. Your best streak is saved **along with the
 date you set it**.
 
+### 🎲 Tournament Simulator
+Draw all 48 finalists into 12 random groups, then play the World Cup your own way.
+Type in the score of every match and the app does the rest: group tables update live,
+the top two from each group plus the eight best third-placed teams qualify, and a
+properly seeded 32-team bracket carries you through to a champion. Level knockout tie?
+It asks for the penalty shoot-out.
+
+Tap any country for its **full 26-player squad** as tiles — shirt number, position,
+age (computed from date of birth, so it stays current), date of birth and current club
+— topped by that team's live group standing and every knockout result so far.
+Your tournament is saved as you go, so you can put the iPad down mid-group.
+
 ### 🌎 World Cup 2026
 Complete results for **all 104 matches** of the Canada / Mexico / USA tournament:
 
