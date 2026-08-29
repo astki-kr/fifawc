@@ -484,6 +484,21 @@ main{
 }
 .grp-team.as-link{ background:none; padding:0; font:inherit; color:inherit; }
 
+/* Country search results */
+.sim-hits{ display:grid; gap:8px; margin-bottom:14px; }
+.sim-hit{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  padding:13px 14px;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r-md); box-shadow:var(--shadow);
+}
+.sim-hit:active{ transform:scale(.985); border-color:var(--accent); }
+.sim-hit .fl{ font-size:24px; flex:0 0 auto; }
+.hit-main{ min-width:0; flex:1; }
+.hit-name{ display:block; font-size:15px; font-weight:800; }
+.hit-sub{ display:block; font-size:12px; font-weight:600; color:var(--ink-2);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
 /* Squad tiles */
 .stand-tile{
   background:var(--surface-2); border:1px solid var(--border);
@@ -691,6 +706,13 @@ tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); 
 
   <!-- ========== VIEW 3: TOURNAMENT SIMULATOR ========== -->
   <section class="view" id="view-sim" role="tabpanel" aria-label="Tournament Simulator" hidden>
+    <!-- Search lives outside #simBody so re-rendering the tournament
+         never steals focus from the box while you are typing. -->
+    <div class="search-wrap">
+      <input class="search" id="simSearch" type="search" autocomplete="off"
+             placeholder="Search a country to see its results…" aria-label="Search country">
+    </div>
+    <div id="simSearchResults"></div>
     <div id="simBody"></div>
   </section>
 
@@ -2460,6 +2482,58 @@ const Simulator = (function () {
     return (r && t) ? t[r.win] : null;
   }
 
+  /** A team's three group fixtures, from that team's point of view. */
+  function teamGroupMatches(team) {
+    const gi = sim().groups.findIndex(g => g.includes(team));
+    if (gi < 0) return [];
+    const L = LETTERS[gi], squad = sim().groups[gi];
+    const out = [];
+    FIXTURES.forEach(([a, b], i) => {
+      if (squad[a] !== team && squad[b] !== team) return;
+      const me = squad[a] === team ? 0 : 1;
+      const sc = sim().gs[gsKey(L, i)];
+      const played = sc && sc[0] !== null && sc[1] !== null;
+      out.push({
+        opponent: me === 0 ? squad[b] : squad[a],
+        score: played ? `${sc[me]}–${sc[1 - me]}` : null,
+        won: played ? (sc[me] > sc[1 - me] ? true : (sc[me] === sc[1 - me] ? null : false)) : undefined
+      });
+    });
+    return out;
+  }
+
+  /** One-line summary of where a team stands, used in search results. */
+  function teamSummary(team) {
+    const gi = sim().groups.findIndex(g => g.includes(team));
+    if (gi < 0) return sim().active ? "Not in this draw" : "No tournament drawn yet";
+    const L = LETTERS[gi], t = table(L);
+    const pos = t.findIndex(r => r.team === team), r = t[pos];
+    const ord = ["1st", "2nd", "3rd", "4th"][pos] || (pos + 1);
+    const kos = teamKnockouts(team).filter(k => k.score !== "not played");
+    const last = kos.length ? ` · ${kos[kos.length - 1].round}` : "";
+    return `Group ${L} · ${ord} · ${r.pts} pt${r.pts === 1 ? "" : "s"} · ${r.p} played${last}`;
+  }
+
+  /** Country search — accent-insensitive, matches anywhere in the name. */
+  function renderSearch(query) {
+    const box = $("#simSearchResults");
+    const q = normalise(query || "");
+    if (!q) { box.innerHTML = ""; return; }
+
+    const hits = teams().filter(t => normalise(t).includes(q)).slice(0, 8);
+    if (!hits.length) {
+      box.innerHTML = `<p class="empty" style="padding:18px">No country matches “${query}”.</p>`;
+      return;
+    }
+    box.innerHTML = `<div class="sim-hits">${hits.map(t => `
+      <button class="sim-hit" data-team="${t}">
+        <span class="fl">${flag(t)}</span>
+        <span class="hit-main"><span class="hit-name">${t}</span>
+          <span class="hit-sub">${teamSummary(t)}</span></span>
+        <span class="wc-caret" aria-hidden="true">›</span>
+      </button>`).join("")}</div>`;
+  }
+
   /** Every knockout tie a team has played, for its detail sheet. */
   function teamKnockouts(team) {
     const out = [];
@@ -2650,6 +2724,18 @@ const Simulator = (function () {
         </div>`;
     }
 
+    // Group fixtures exactly as entered in the simulator.
+    const gms = teamGroupMatches(team);
+    const groupTile = gms.length ? `
+      <div class="stand-tile">
+        <div class="al">Group matches</div>
+        ${gms.map(m => `<div class="ko-line">
+          <span class="r">${m.score ? (m.won === true ? "Won" : m.won === false ? "Lost" : "Drew") : "—"}</span>
+          <span class="o">v ${flag(m.opponent)} ${m.opponent}</span>
+          <span class="s ${m.won === true ? "w" : (m.won === false ? "l" : "")}">${m.score || "not entered"}</span>
+        </div>`).join("")}
+      </div>` : "";
+
     const kos = teamKnockouts(team);
     const koTile = kos.length ? `
       <div class="stand-tile">
@@ -2677,7 +2763,7 @@ const Simulator = (function () {
         <div class="grabber"></div>
         <h2>${flag(team)} ${team}</h2>
         <p class="host">${squad.length}-player squad</p>
-        ${standTile}${koTile}
+        ${standTile}${groupTile}${koTile}
         <div class="p-grid">${tiles}</div>
         <button class="btn btn-ghost" data-close>Close</button>
       </div>`;
@@ -2698,6 +2784,13 @@ const Simulator = (function () {
   function init() {
     render();
     const body = $("#simBody");
+
+    // Country search: live results, and tapping one opens its sheet.
+    $("#simSearch").addEventListener("input", e => renderSearch(e.target.value));
+    $("#simSearchResults").addEventListener("click", e => {
+      const hit = e.target.closest("[data-team]");
+      if (hit) openTeamSheet(hit.dataset.team);
+    });
 
     body.addEventListener("click", e => {
       const teamBtn = e.target.closest("[data-team]");
@@ -2742,7 +2835,8 @@ const Simulator = (function () {
     if (groupsDone() !== has) render();
   }
 
-  return { init, render, ageFrom, bracketOrder, qualifiers, table, stage, newTournament };
+  return { init, render, ageFrom, bracketOrder, qualifiers, table, stage, newTournament,
+           renderSearch, teamGroupMatches, teamSummary, teamKnockouts };
 })();
 
 
