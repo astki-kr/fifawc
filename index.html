@@ -636,6 +636,33 @@ tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); 
 .goal .who{ font-weight:700; flex:1; }
 .goal .tag{ font-size:10px; font-weight:800; text-transform:uppercase; color:var(--ink-3); }
 
+/* ============================================================
+   11. UPDATE TOAST
+   ============================================================ */
+.update-bar{
+  position:fixed; left:12px; right:12px;
+  bottom:calc(var(--nav-h) + env(safe-area-inset-bottom) + 12px);
+  z-index:45;
+  max-width:calc(var(--maxw) - 24px); margin:0 auto;
+  display:flex; align-items:center; gap:10px;
+  padding:12px 12px 12px 16px;
+  border-radius:16px;
+  background:var(--accent); color:var(--accent-ink);
+  box-shadow:var(--shadow-lg);
+  animation:rise .3s ease both;
+}
+.update-bar[hidden]{ display:none; }
+.update-bar .msg{ flex:1; font-size:14px; font-weight:700; }
+.update-bar button{
+  min-height:40px; padding:0 14px; border-radius:11px;
+  font-size:14px; font-weight:800;
+  background:var(--accent-ink); color:var(--accent);
+}
+.update-bar button.x{
+  min-width:40px; padding:0; background:transparent; color:var(--accent-ink);
+  font-size:17px; opacity:.85;
+}
+
 @media (prefers-reduced-motion:reduce){
   *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
@@ -770,6 +797,13 @@ tr.qualified .grp-team .pos{ background:var(--accent); color:var(--accent-ink); 
     <div class="wc-list" id="wcList" style="margin-top:12px"></div>
   </section>
 </main>
+
+<!-- Shown only when a newer version has been deployed. -->
+<div class="update-bar" id="updateBar" role="status" hidden>
+  <span class="msg">✨ A new version is available</span>
+  <button id="updateBtn">Update</button>
+  <button class="x" id="updateDismiss" aria-label="Dismiss">✕</button>
+</div>
 
 <!-- ========== BOTTOM TAB BAR ========== -->
 <nav class="tabbar" role="tablist" aria-label="Main">
@@ -2859,6 +2893,66 @@ document.querySelector(".tabbar").addEventListener("click", e => {
   if (btn) showView(btn.dataset.view);
 });
 
+/* ==================================================================
+   G. UPDATER
+   ------------------------------------------------------------------
+   iOS caches home-screen web apps aggressively, so a freshly deployed
+   index.html can stay invisible for a long time. This compares the
+   version baked into the page against version.json on the server and
+   offers a one-tap refresh.
+
+   Reloading alone would not help — the browser would just serve the
+   same cached HTML — so the update navigates to "?v=<new version>".
+   That is a different URL, and therefore a different cache entry, so
+   the browser is forced to fetch a fresh copy.
+
+   It never reloads on its own: a surprise refresh mid-tournament
+   would be worse than a stale page. Offline, the check fails
+   silently and nothing is shown.
+   ================================================================== */
+const APP_VERSION = "2026.08.29.1922";
+
+const Updater = (function () {
+  let lastCheck = 0;
+  const MIN_GAP = 5 * 60 * 1000;             // don't re-check more than every 5 min
+
+  function show(version) {
+    const bar = document.getElementById("updateBar");
+    if (!bar || !bar.hidden) return;
+    bar.hidden = false;
+    document.getElementById("updateBtn").onclick = () => {
+      // A new query string = a new cache key = a guaranteed fresh fetch.
+      location.replace(location.pathname + "?v=" + encodeURIComponent(version));
+    };
+    document.getElementById("updateDismiss").onclick = () => { bar.hidden = true; };
+  }
+
+  async function check(force) {
+    const now = Date.now();
+    if (!force && now - lastCheck < MIN_GAP) return;
+    lastCheck = now;
+    try {
+      // Cache-bust the check itself, or we would read a stale version file.
+      const res = await fetch("version.json?t=" + now, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data && data.version && data.version !== APP_VERSION) show(data.version);
+    } catch (e) {
+      /* offline or blocked — stay quiet, the app works fine as-is */
+    }
+  }
+
+  function init() {
+    check();
+    // Re-check when the app is brought back to the foreground.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) check();
+    });
+  }
+
+  return { init, check, APP_VERSION };
+})();
+
 const VIEWS = ["daily", "streak", "sim", "wc2026", "history"];
 
 (async function boot() {
@@ -2868,6 +2962,7 @@ const VIEWS = ["daily", "streak", "sim", "wc2026", "history"];
   StreakGame.init();
   Simulator.init();
   History.init();
+  Updater.init();
   const wanted = location.hash.replace("#", "");
   showView(VIEWS.includes(wanted) ? wanted : "daily");
 })();
